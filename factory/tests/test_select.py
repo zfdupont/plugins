@@ -14,7 +14,16 @@ from factory_config import glob_match, select
     ("scripts/train_*", "scripts/train_cfr.py", True),
     ("scripts/train_*", "scripts/sub/train_x.py", False),
     ("**/*.cpp", "common/src/game/card.cpp", True),
-    ("*.md", "docs/a.md", False),
+    ("*.md", "docs/a.md", True),
+    ("**/*.py", "setup.py", True),
+    ("*.py", "src/a.py", True),
+    ("web", "web/a.js", True),
+    ("web", "src/web/a.js", True),
+    ("web", "webapp/a.js", False),
+    ("src/**/test_*.py", "src/test_a.py", True),
+    ("src/**/test_*.py", "src/x/y/test_a.py", True),
+    ("src/greet", "src/greet/cli.py", True),
+    ("src/greet", "lib/src/greet/cli.py", False),
     ("src/?.c", "src/a.c", True),
     ("a+b.txt", "a+b.txt", True),
     ("a.txt", "abtxt", False),
@@ -64,3 +73,14 @@ def test_select_cli_path_with_space(tmp_path):
     commit_file(repo, "my docs/a.md")
     res = run_cli("select", repo, "HEAD~1", "HEAD")
     assert json.loads(res.stdout) == {"run": ["logic", "docs"], "skipped": []}
+
+
+def test_select_cli_counts_old_name_of_a_rename(tmp_path):
+    text = MINIMAL + "  - {name: api, why: y, paths: ['web/']}\n"
+    repo = make_repo(tmp_path, text, agents=["factory-review-logic", "factory-review-api"])
+    git_init(repo)
+    commit_file(repo, "web/api.py", "a\nb\nc\nd\n")
+    git(repo, "mv", "web/api.py", "legacy.py")
+    git(repo, "commit", "-q", "-m", "move")
+    res = run_cli("select", repo, "HEAD~1", "HEAD")
+    assert json.loads(res.stdout) == {"run": ["logic", "api"], "skipped": []}

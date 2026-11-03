@@ -54,9 +54,10 @@ def test_migration_check_flags_active_loop(tmp_path):
     loop.write_text("---\nactive: true\niteration: 3\n---\n\ngo\n")
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", "loop")
-    res = run_cli("migration-check", repo)
+    res = run_cli("migration-check", repo, "--loop-file", "factory/.claude/ralph-loop.local.md")
     assert res.returncode == 1
-    assert "ralph loop active (factory/.claude/ralph-loop.local.md)" in res.stdout
+    assert "loop active (factory/.claude/ralph-loop.local.md)" in res.stdout
+    assert run_cli("migration-check", repo).stdout.strip() == "ok"
 
 
 def test_migration_check_inactive_loop_ok(tmp_path):
@@ -66,7 +67,7 @@ def test_migration_check_inactive_loop_ok(tmp_path):
     loop.write_text("---\nactive: false\n---\n")
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", "loop")
-    assert run_cli("migration-check", repo).stdout.strip() == "ok"
+    assert run_cli("migration-check", repo, "--loop-file", "factory/.claude/ralph-loop.local.md").stdout.strip() == "ok"
 
 
 def test_migration_check_flags_dirty_tree(tmp_path):

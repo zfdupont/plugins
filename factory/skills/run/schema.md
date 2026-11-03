@@ -15,7 +15,7 @@ Skills never parse this file themselves. They call
 | `get <repo> <dotted.key>` | the value as JSON, defaults applied; `null` when missing |
 | `select <repo> <base> <head>` | `{"run": [...], "skipped": [...]}` for the round |
 | `builder-done <worktree> <before_sha> <build_md> <round>` | `done` and exit 0, or the reason and exit 1 |
-| `migration-check <repo>` | `ok` and exit 0, or one line per blocker and exit 1 |
+| `migration-check <repo> [--loop-file <path>]` | `ok` and exit 0, or one line per blocker (an active loop in the given state file, a dirty tree, a job in flight) and exit 1 |
 
 ## Keys
 
@@ -30,7 +30,8 @@ Any key not in this table is an error.
 | `worktrees` | string | `../<repo-dir>-factory` | job worktrees go in `<worktrees>/<job-id>` |
 | `context` | list of paths | `[]` | what spec-writer, builder, reviewers, approver and arbiter read first |
 | `rules` | path, optional `#Heading` | none | the repo's hard rules (for example `.mex/AGENTS.md#Non-Negotiables`) |
-| `commands` | map name to shell command | required, non-empty | open set; the builder runs every one and all must pass |
+| `tests` | `none`, `thin` or `ok` | `ok` if `commands.test` exists, else `none` | state of the test suite; setup sets it from the survey (`thin`: the command runs but few or no tests exercise the code). Anything but `ok` tells the approver and arbiter to escalate changes they cannot check |
+| `commands` | map name to shell command | required, non-empty unless `tests: none` | open set; the builder runs every one and all must pass. Name the test command `test` |
 | `merge_gate` | list of `commands` keys | `[test]` if `test` exists, else `[]` | what the orchestrator reruns on `base` after a merge |
 | `scout` | map | `{}` | `todo_paths` (list), `docs` (list), `checks` (list of one-line foundations checks) |
 | `builder` | map | `{runtime: claude, resume: session}` | see Builder |
@@ -61,22 +62,32 @@ Each entry:
 
 | field | meaning |
 |---|---|
-| `name` | matches `^[a-z][a-z0-9-]*$`, unique; the agent is `.claude/agents/factory-review-<name>.md` and writes `round-N/review-<name>.md` |
+| `name` | matches `^[a-z][a-z0-9-]*$`, unique, not `qa`; the agent is `.claude/agents/factory-review-<name>.md` and writes `round-N/review-<name>.md` |
 | `why` | one line naming what in this repo makes the reviewer worth running |
-| `paths` | optional globs; without it the reviewer runs every round |
+| `paths` | optional non-empty list of globs; without it the reviewer runs every round |
 | `model` | optional `<model> [effort]`, overrides `models.reviewers` |
 
 A reviewer with `paths` runs only when a file in
 `git diff --name-only <base>...<head>` matches one of them. QA follows the same
 rule with `qa.paths`, runs in the same round, and writes `round-N/review-qa.md`.
 
-Glob rules, matched against the whole path:
+Glob rules (gitignore style):
 
-- a pattern ending in `/` matches any path under that directory (`web/`);
-- `**` matches any characters, including `/`;
-- `*` matches any characters except `/`;
-- `?` matches one character except `/`;
+- a pattern matches a changed file if it matches the file's path or any
+  directory above it, so `web` and `web/` both cover everything under `web/`;
+- a pattern with no `/` (other than a trailing one) matches at any depth:
+  `*.py` matches `src/a.py`, `web` matches `src/web/a.js`;
+- a pattern with a `/` is anchored at the repo root: `src/greet` matches
+  `src/greet/cli.py` but not `lib/src/greet/cli.py`;
+- `**/` matches zero or more directories (`src/**/test_*.py` matches
+  `src/test_a.py`); `**` elsewhere matches any characters, including `/`;
+- `*` matches any characters except `/`; `?` matches one character except `/`;
 - everything else is literal.
+
+Renames count under both names: moving `web/api.py` to `legacy/api.py` runs a
+`web/` reviewer.
+
+At least one reviewer must have no `paths`, so every round has a reviewer.
 
 ## Example
 

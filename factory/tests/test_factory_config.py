@@ -122,3 +122,66 @@ def test_reviewer_entry_not_a_mapping(tmp_path):
     text = "version: 1\nbase: main\ncommands: {test: t}\nreviewers: [logic]\n"
     repo = make_repo(tmp_path, text, agents=["factory-review-logic"])
     assert "factory.yaml: each reviewer must be a mapping with name and why" in validate(repo)
+
+
+# Final review I1: wrong types and typos are named, never a traceback.
+import pytest
+
+
+@pytest.mark.parametrize("extra,message", [
+    ("builder: claude\n", "factory.yaml: builder must be a mapping"),
+    ("models: [a]\n", "factory.yaml: models must be a mapping"),
+    ("merge_gate: test\n", "factory.yaml: merge_gate must be a list"),
+    ("merge_gate: 5\n", "factory.yaml: merge_gate must be a list"),
+    ("max_rework: two\n", "factory.yaml: max_rework must be a whole number"),
+    ("models: {reviewr: sonnet}\n", "factory.yaml: unknown key 'models.reviewr'"),
+    ("builder: {comand: x}\n", "factory.yaml: unknown key 'builder.comand'"),
+    ("scout: {todo_path: [a]}\n", "factory.yaml: unknown key 'scout.todo_path'"),
+    ("qa: {agent: factory-review-logic, paths: web/}\n", "factory.yaml: qa paths must be a non-empty list of strings"),
+    ("tests: maybe\n", "factory.yaml: tests must be none, thin or ok"),
+])
+def test_bad_types_and_nested_typos(tmp_path, extra, message):
+    repo = make_repo(tmp_path, MINIMAL + extra, agents=["factory-review-logic"])
+    assert message in validate(repo)
+
+
+def test_reviewer_unknown_field_and_bad_model(tmp_path):
+    text = "version: 1\nbase: main\ncommands: {test: t}\nreviewers:\n  - {name: logic, why: x, path: [web/], model: gpt}\n"
+    repo = make_repo(tmp_path, text, agents=["factory-review-logic"])
+    errors = validate(repo)
+    assert "factory.yaml: unknown key 'reviewers.logic.path'" in errors
+    assert "factory.yaml: reviewer 'logic' model 'gpt' must be '<model> [effort]'" in errors
+
+
+def test_reviewer_named_qa_reserved(tmp_path):
+    text = "version: 1\nbase: main\ncommands: {test: t}\nreviewers:\n  - {name: logic, why: x}\n  - {name: qa, why: y}\n"
+    repo = make_repo(tmp_path, text, agents=["factory-review-logic", "factory-review-qa"])
+    assert "factory.yaml: reviewer name 'qa' is reserved for QA" in validate(repo)
+
+
+# Final review I2: a round can never have zero reviewers.
+def test_needs_an_always_on_reviewer(tmp_path):
+    text = "version: 1\nbase: main\ncommands: {test: t}\nreviewers:\n  - {name: api, why: x, paths: [web/]}\n"
+    repo = make_repo(tmp_path, text, agents=["factory-review-api"])
+    assert "factory.yaml: at least one reviewer must run every round (no paths)" in validate(repo)
+
+
+def test_empty_paths_rejected(tmp_path):
+    text = MINIMAL + "  - {name: api, why: y, paths: []}\n"
+    repo = make_repo(tmp_path, text, agents=["factory-review-logic", "factory-review-api"])
+    assert "factory.yaml: reviewer 'api' paths must be a non-empty list of strings" in validate(repo)
+
+
+# Final review I5: test-suite state is explicit.
+def test_tests_default_from_commands(tmp_path):
+    repo = make_repo(tmp_path, MINIMAL, agents=["factory-review-logic"])
+    assert load(repo)["tests"] == "ok"
+    text = "version: 1\nbase: main\ncommands: {build: make}\nreviewers:\n  - {name: logic, why: x}\n"
+    repo2 = make_repo(tmp_path / "b", text, agents=["factory-review-logic"])
+    assert load(repo2)["tests"] == "none"
+
+
+def test_empty_commands_allowed_when_no_tests(tmp_path):
+    text = "version: 1\nbase: main\ntests: none\ncommands: {}\nreviewers:\n  - {name: logic, why: x}\n"
+    repo = make_repo(tmp_path, text, agents=["factory-review-logic"])
+    assert validate(repo) == []
