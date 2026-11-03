@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -148,6 +149,52 @@ def get(cfg: dict, dotted: str):
     return value
 
 
+def glob_regex(pattern: str) -> re.Pattern:
+    if pattern.endswith("/"):
+        pattern += "**"
+    out, i = [], 0
+    while i < len(pattern):
+        if pattern.startswith("**", i):
+            out.append(".*")
+            i += 2
+        elif pattern[i] == "*":
+            out.append("[^/]*")
+            i += 1
+        elif pattern[i] == "?":
+            out.append("[^/]")
+            i += 1
+        else:
+            out.append(re.escape(pattern[i]))
+            i += 1
+    return re.compile("".join(out))
+
+
+def glob_match(pattern: str, path: str) -> bool:
+    """Whole-path match under the rules in ../schema.md."""
+    return glob_regex(pattern).fullmatch(path) is not None
+
+
+def select(cfg: dict, changed: list[str]) -> dict:
+    """Which reviewers (and qa) run this round, given the changed files."""
+    run, skipped = [], []
+
+    def place(name: str, paths) -> None:
+        hit = paths is None or any(glob_match(p, f) for p in paths for f in changed)
+        (run if hit else skipped).append(name)
+
+    for rev in cfg.get("reviewers") or []:
+        place(rev["name"], rev.get("paths"))
+    if cfg.get("qa"):
+        place("qa", cfg["qa"].get("paths"))
+    return {"run": run, "skipped": skipped}
+
+
+def git_out(repo: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(repo), *args], check=True, capture_output=True, text=True
+    ).stdout
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="factory_config.py")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -155,6 +202,9 @@ def main(argv: list[str]) -> int:
     p = sub.add_parser("get")
     p.add_argument("repo")
     p.add_argument("key")
+    p = sub.add_parser("select")
+    for arg in ("repo", "base", "head"):
+        p.add_argument(arg)
     args = parser.parse_args(argv)
 
     if args.cmd == "validate":
@@ -163,6 +213,11 @@ def main(argv: list[str]) -> int:
         return 1 if errors else 0
     if args.cmd == "get":
         print(json.dumps(get(load(Path(args.repo)), args.key)))
+        return 0
+    if args.cmd == "select":
+        repo = Path(args.repo)
+        changed = [f for f in git_out(repo, "diff", "-z", "--name-only", f"{args.base}...{args.head}").split("\0") if f]
+        print(json.dumps(select(load(repo), changed)))
         return 0
     return 2
 
