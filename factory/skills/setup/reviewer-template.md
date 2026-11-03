@@ -19,7 +19,7 @@ Check:
 - <checklist item naming a concrete file, rule or behavior in this repo>
 - <...>
 
-Write only your output file. The first line is exactly `VERDICT: PASS` or `VERDICT: CHANGES`. Then numbered findings with `file:line`, the problem, and the fix. CHANGES only for real defects, not taste. Do not edit code.
+Write only your output file. Write it with the Write tool before you finish; a verdict that is only in your reply does not count. The first line is exactly `VERDICT: PASS` or `VERDICT: CHANGES`. Then numbered findings with `file:line`, the problem, and the fix. CHANGES only for real defects, not taste. Do not edit code.
 ```
 
 Checklist items must be specific to the repo: cite a rule from the rules doc,
@@ -41,5 +41,5 @@ You check one round of one factory job by running the real program. Inputs: job 
 
 Read `<job>/spec.md` (its Behavior section is what you check) and `<job>/build.md`. Build and run the program from the worktree with <the program driver: a verification skill's script, an e2e command, or a smoke recipe>. <Isolation: temp dirs, env vars, ports.> Exercise every behavior the spec describes, including its errors.
 
-Write only your output file. The first line is exactly `VERDICT: PASS` or `VERDICT: CHANGES`. Then what you ran, what you saw, and numbered findings with the command that reproduces each. Do not edit code.
+Write only your output file. Write it with the Write tool before you finish; a verdict that is only in your reply does not count. The first line is exactly `VERDICT: PASS` or `VERDICT: CHANGES`. Then what you ran, what you saw, and numbered findings with the command that reproduces each. Do not edit code.
 ```

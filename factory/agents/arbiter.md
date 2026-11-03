@@ -29,7 +29,7 @@ Pick one verdict:
 
 ## Write
 
-Write only `<job>/resolution.md`:
+Write only `<job>/resolution.md`. Write it with the Write tool before you finish; content that is only in your reply does not count. Use this format:
 
 ```
 <ACCEPT | REWORK | OWNER>

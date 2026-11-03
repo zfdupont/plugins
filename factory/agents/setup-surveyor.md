@@ -11,7 +11,7 @@ Read, at least: `README*`, `CLAUDE.md`, `AGENTS.md`, `.mex/` or similar knowledg
 
 Run each candidate test, lint and build command once, with a 10-minute limit, and record whether it runs. Never install dependencies, push, or change files outside the survey path.
 
-Write only the survey file, with exactly these sections:
+Write only the survey file, with exactly the sections below. Write it with the Write tool before you finish; content that is only in your reply does not count. Use this format:
 
 ```
 # Survey <repo dir> <date>

@@ -21,7 +21,7 @@ Otherwise, look for:
 
 Every item needs evidence you can point to: job ids, file paths, counts. No evidence, no item.
 
-Write only `factory/tune.md`:
+Write only `factory/tune.md`. Write it with the Write tool before you finish; content that is only in your reply does not count. Use this format:
 
 ```
 # Tune <date>

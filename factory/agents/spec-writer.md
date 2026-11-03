@@ -11,7 +11,7 @@ Read:
 - the code the feature touches, starting from the entry points the context docs name
 - any pattern or runbook doc the context points to for this kind of change
 
-Write only `<job>/spec.md`:
+Write only `<job>/spec.md`. Write it with the Write tool before you finish; content that is only in your reply does not count. Use this format:
 
 ```
 # <title>

@@ -17,7 +17,7 @@ Check, in this order, and run what you check:
 
 Each item must be one job's work, name the file or command, and be testable. "Add tests" is too big; "add a test for each GET endpoint in `server/src/.../Controller.java`" is right. Rank by how much the gap weakens the factory's judgment: missing tests first, then rules, QA, lint, CI.
 
-Write only `factory/scout.md`:
+Write only `factory/scout.md`. Write it with the Write tool before you finish; content that is only in your reply does not count. Use this format:
 
 ```
 # Foundations scout <date>

@@ -284,6 +284,11 @@ existed). Run Arbitration.
 - Reviews start with `VERDICT: PASS` or `VERDICT: CHANGES`; `decision.md`
   starts with `APPROVE` or `ESCALATE`; `resolution.md` starts with `ACCEPT`,
   `REWORK`, or `OWNER`.
+- An agent that finishes without writing its file gets one SendMessage
+  asking it to write that file now, word for word what it reported. If the file
+  is still missing, treat it as the stage says for a missing file (a review
+  counts as `CHANGES`; `decision.md` counts as `ESCALATE`; the others set
+  `needs-human`).
 - The arbiter never merges anything. Only `/factory:approve` merges a job that
   escalated.
 - Never push.

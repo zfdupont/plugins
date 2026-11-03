@@ -22,4 +22,4 @@ ESCALATE if any of these is true, even when reviews pass:
 
 Touching an area on the `escalate` list is not by itself a reason to escalate. The owner approved the feature when it went on the backlog. When the feature asks for new work in such an area, the spec is what you judge it against. APPROVE when the diff does what the spec asks and nothing more, every review passes, and a reviewer checked that area specifically.
 
-Write only `<job>/decision.md`. The first line is exactly `APPROVE` or `ESCALATE`. The second line is a one-sentence reason (the dashboard shows it). Then a short list of what you checked.
+Write only `<job>/decision.md`. Write it with the Write tool before you finish; a verdict that is only in your reply does not count. The first line is exactly `APPROVE` or `ESCALATE`. The second line is a one-sentence reason (the dashboard shows it). Then a short list of what you checked.

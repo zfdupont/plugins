@@ -15,7 +15,7 @@ Search, in this order:
 
 Keep only items one builder can finish in one job: small, testable, and not in an area the `escalate` list names (those escalate anyway). Rank by value to a user of the project, then by smallness.
 
-Write only `factory/scout.md`:
+Write only `factory/scout.md`. Write it with the Write tool before you finish; content that is only in your reply does not count. Use this format:
 
 ```
 # Scout <date>
