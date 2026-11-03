@@ -1,0 +1,12 @@
+{
+  "name": "factory",
+  "version": "0.1.0",
+  "description": "A spec-to-merge software factory you set up per repo: spec writer, builder, a reviewer panel chosen for the codebase, approver and arbiter, coordinated through files and a dashboard.",
+  "author": {
+    "name": "zfdupont"
+  },
+  "homepage": "https://github.com/zfdupont/plugins/tree/main/factory",
+  "repository": "https://github.com/zfdupont/plugins",
+  "license": "MIT",
+  "keywords": ["factory", "workflow", "review", "subagents", "spec"]
+}
