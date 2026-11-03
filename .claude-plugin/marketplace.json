@@ -1,0 +1,18 @@
+{
+  "name": "zfdupont-plugins",
+  "owner": {
+    "name": "zfdupont"
+  },
+  "metadata": {
+    "description": "zfdupont's personal Claude Code plugins."
+  },
+  "plugins": [
+    {
+      "name": "pstack",
+      "source": "./pstack",
+      "description": "A native Claude Code port of poteto's pstack: rigorous agent workflows you can parallelize with confidence.",
+      "version": "0.15.36-claude.1",
+      "category": "development"
+    }
+  ]
+}
