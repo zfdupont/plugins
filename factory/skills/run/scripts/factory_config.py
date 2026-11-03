@@ -195,6 +195,43 @@ def git_out(repo: Path, *args: str) -> str:
     ).stdout
 
 
+IN_FLIGHT = ("spec", "build", "review", "approval", "arbitration")
+LOOP_FILE = "factory/.claude/ralph-loop.local.md"
+
+
+def builder_done(worktree: Path, before_sha: str, build_md: Path, round_n: str) -> str | None:
+    """None when the builder finished round_n; otherwise the reason it did not."""
+    if not git_out(worktree, "rev-list", f"{before_sha}..HEAD").strip():
+        return "no new commit"
+    lines = build_md.read_text().splitlines() if build_md.exists() else []
+    if f"## Round {round_n}" not in (line.rstrip() for line in lines):
+        return f"build.md has no ## Round {round_n}"
+    return None
+
+
+def loop_active(path: Path) -> bool:
+    if not path.exists():
+        return False
+    parts = path.read_text().split("---")
+    front = yaml.safe_load(parts[1]) if len(parts) >= 3 else None
+    return bool(isinstance(front, dict) and front.get("active"))
+
+
+def migration_blockers(repo: Path) -> list[str]:
+    """Why the repo's factory cannot be migrated right now; [] when it can."""
+    blockers = []
+    if loop_active(repo / LOOP_FILE):
+        blockers.append(f"ralph loop active ({LOOP_FILE})")
+    if git_out(repo, "status", "--porcelain").strip():
+        blockers.append("working tree not clean")
+    board = repo / "factory" / "board.json"
+    jobs = json.loads(board.read_text()).get("jobs", []) if board.exists() else []
+    for job in jobs:
+        if job.get("stage") in IN_FLIGHT:
+            blockers.append(f"job {job.get('id')} in flight at stage {job['stage']}")
+    return blockers
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="factory_config.py")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -205,7 +242,20 @@ def main(argv: list[str]) -> int:
     p = sub.add_parser("select")
     for arg in ("repo", "base", "head"):
         p.add_argument(arg)
+    p = sub.add_parser("builder-done")
+    for arg in ("worktree", "before_sha", "build_md", "round"):
+        p.add_argument(arg)
+    sub.add_parser("migration-check").add_argument("repo")
     args = parser.parse_args(argv)
+
+    if args.cmd == "builder-done":
+        reason = builder_done(Path(args.worktree), args.before_sha, Path(args.build_md), args.round)
+        print(reason or "done")
+        return 1 if reason else 0
+    if args.cmd == "migration-check":
+        blockers = migration_blockers(Path(args.repo))
+        print("\n".join(blockers) if blockers else "ok")
+        return 1 if blockers else 0
 
     if args.cmd == "validate":
         errors = validate(Path(args.repo))
