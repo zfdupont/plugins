@@ -98,9 +98,11 @@ plugins/factory/
   .claude-plugin/plugin.json
   README.md
   skills/
-    factory/SKILL.md            orchestrator: the loop and every /factory command
-    factory/schema.md           factory.yaml reference (read by setup and the orchestrator)
-    factory/dashboard.html      copied into a repo's factory/ by setup
+    run/SKILL.md                orchestrator: the shared loop and /factory:run
+    run/schema.md               factory.yaml reference (read by setup and the orchestrator)
+    run/dashboard.html          copied into a repo's factory/ by setup
+    run/scripts/factory_config.py   validate, get, select, builder-done, migration-check
+    next/ scout/ approve/ rework/ arbitrate/ setup/ tune/   one thin skill per command
   agents/
     spec-writer.md
     builder.md

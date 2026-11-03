@@ -8,7 +8,7 @@ You make the final call on one factory job. Inputs: job folder, worktree, branch
 Read everything in the job folder: `feature.md`, `spec.md`, `build.md`, every `round-*/review-*.md`, any `rework-*.md`. Read `git -C <worktree> diff <base>...HEAD --stat` and the diff itself. Run every command in `commands` in the worktree and confirm each passes.
 
 APPROVE only if all hold:
-- Every acceptance criterion is met and tested.
+- Every acceptance criterion is met and tested. When `no_tests: true`, a criterion you checked by running the program or reading the code counts; say which in decision.md.
 - The change matches the feature request and stays in scope.
 - Every review file in round N says `VERDICT: PASS`, and no reviewer finding was waved away without reason.
 

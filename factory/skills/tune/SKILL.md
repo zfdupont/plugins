@@ -11,9 +11,12 @@ factory doing, and what should change?".
 Read `../run/SKILL.md`, resolved against this skill's base directory, and run
 its `## Setup check`. Its `CFG`, `REPO` and settings apply here.
 
-1. Spawn `factory:tuner` with the checkout of `base`, the absolute path of
-   `factory/`, and the path of `factory/factory.yaml`. Use `models.tuner`.
-   Wait for `factory/tune.md`.
+1. Create a throwaway checkout of `base` for running commands:
+   `git worktree add --detach REPO/.git/factory-scratch <base>`. Spawn
+   `factory:tuner` with that checkout, the absolute path of `factory/`, and
+   the path of `factory/factory.yaml`. Use `models.tuner`. Wait for
+   `factory/tune.md`, then remove the scratch checkout
+   (`git worktree remove --force REPO/.git/factory-scratch`).
 2. Show the first line of `tune.md`, then ask the owner which suggestions to
    apply: one multi-select question, one option per item, in the file's
    order, with `Kind`, `Impact` and the one-line suggestion as the
@@ -25,7 +28,8 @@ its `## Setup check`. Its `CFG`, `REPO` and settings apply here.
      changes applied (setup's survey and proposal steps are skipped). The
      owner sees the diff and approves it there.
    - Backlog items: append each to `backlog.md` as `- [ ] <item>` under a
-     `## From tune <date>` heading at the end, or under `## Foundations` for
-     `foundations` items.
+     `## From tune <date>` heading at the end. `foundations` items go under
+     `## Foundations` instead, placed as setup's `## Foundations` step 3 says
+     (directly after the file's first line, created if missing).
 4. Leave `tune.md` in place; the next tune run overwrites it. Tell the owner
    what changed and that nothing is committed.

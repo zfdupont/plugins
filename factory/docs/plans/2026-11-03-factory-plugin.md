@@ -326,7 +326,7 @@ def test_migration_check_ok_with_needs_human_and_merged(tmp_path): ...
 
 ### Task 12: Migrate sc (after the loop ends)
 
-- [ ] **Step 1:** Run `uv run --script ~/plugins/factory/skills/run/scripts/factory_config.py migration-check ~/sc`. Expected: `ok`. If not, stop and report the lines. Do not touch sc.
+- [ ] **Step 1:** Run `uv run --script ~/plugins/factory/skills/run/scripts/factory_config.py migration-check ~/sc --loop-file factory/.claude/ralph-loop.local.md`. Expected: `ok`. If not, stop and report the lines. Do not touch sc.
 - [ ] **Step 2:** Diff sc's working `arbiter.md` and factory `SKILL.md` against the versions Task 5 and Task 6 started from. Port any changes into the plugin and commit there.
 - [ ] **Step 3:** In sc, on a new branch, run `/factory:setup`. Expected: lineup of security, logic, maintainability and a CLI output-and-flow reviewer, plus `qa` with a `factory-qa` agent that runs `.claude/skills/verify-sc/scv`. The owner approves.
 - [ ] **Step 4:** Remove `~/sc/.claude/skills/factory/` and the sc agents the plugin replaces (`spec-writer builder approver arbiter scout review-*`). Keep `factory/board.json`, `jobs/` and `backlog.md`.

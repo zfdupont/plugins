@@ -20,9 +20,12 @@ Never write to the working tree before the owner approves.
 
 ## Survey
 
-1. Delete any old `DRAFT`, then create `DRAFT/proposed/`.
-2. Spawn `factory:setup-surveyor` with REPO, the survey path
-   `DRAFT/survey.md`, and the path of `factory/factory.yaml` if it exists.
+1. Delete any old `DRAFT` (run `git worktree remove --force DRAFT/wt` first
+   if it exists), then create `DRAFT/proposed/` and a throwaway checkout for
+   running commands: `git worktree add --detach DRAFT/wt HEAD`.
+2. Spawn `factory:setup-surveyor` with REPO, the scratch checkout `DRAFT/wt`
+   (where it runs every command), the survey path `DRAFT/survey.md`, and the
+   path of `factory/factory.yaml` if it exists.
    Use `models.setup-surveyor` from the current YAML if there is one. Wait for
    the survey.
 
@@ -38,9 +41,14 @@ per reviewer, and `.claude/agents/<qa agent>.md` if there is QA.
 - `context`: the docs an agent must read to work here (`CLAUDE.md`, the
   knowledge-folder anchor and conventions docs). Keep it short.
 - `rules`: the rules doc and heading from the survey, if one is filled in.
+- `tests`: from the survey's test count. `ok` when a test command runs and
+  real tests exercise the code; `thin` when it runs but few or no tests do (for
+  example, every test commented out); `none` when there is no test command.
 - `commands`: every command the survey says runs: test, lint, build, type
-  check. Leave out commands that do not run, and list them as gaps instead.
-  Set `merge_gate` to the fast ones, at least `test` when it exists.
+  check. Name the test command `test`. Leave out commands that do not run, and
+  list them as gaps instead. Set `merge_gate` to the fast ones, at least `test`
+  when it exists. With `tests: none` and nothing runnable, `commands` may be
+  empty.
 - `builder`: copy how the repo builds code today. A runner script gives
   `runtime: command` with its arguments mapped to `{session}`,
   `{prompt_file}` and `{out_prefix}`. Otherwise `runtime: claude`.
@@ -85,22 +93,23 @@ eight items that cite this repo's rules, conventions or files.
 This section is shared: `/factory:tune` sends its approved settings changes
 through it too.
 
-1. Show the owner the proposal:
-   - If the survey found no runnable test command, say first, in one line,
-     that the repo has no test suite, so the approver will escalate changes it
+1. Run `CFG validate DRAFT/proposed` and fix the draft until it passes, so
+   the owner only ever sees a valid proposal. Then show the owner the proposal:
+   - If `tests` is `none` or `thin`, say first, in one line, that the repo has
+     no real test suite, so the approver and arbiter will escalate changes they
      cannot check.
    - The lineup as a table: reviewer, runs when (`always` or its `paths`),
      why. Then QA, the builder runtime, `commands` and `merge_gate`, the
      `escalate` list, `related`, and `models`.
    - On a rerun (a `factory/factory.yaml` already exists): instead of the
      table alone, show `diff -ru` between the current files and
-     `DRAFT/proposed/`, then one reason per change. Say plainly when a change
-     undoes a hand edit (a value in the current file that the last proposal
-     would not have made).
+     `DRAFT/proposed/`, then one reason per change. Remind the owner that
+     the diff removes any hand edits it does not keep.
 2. Ask the owner to approve, or to say what to change. Apply their edits to
    `DRAFT/proposed/` and show the changed parts again. Repeat until they
    approve or decline.
-3. Declined: delete `DRAFT` and stop. Nothing in the working tree changed.
+3. Declined: remove `DRAFT/wt` if it exists (`git worktree remove --force`), delete
+   `DRAFT`, and stop. Nothing in the working tree changed.
 4. Approved: copy `DRAFT/proposed/` over the repo. On a rerun, also delete
    reviewer agent files (`factory-review-*.md`) and the QA agent that the new
    proposal dropped. Never touch `factory/board.json` contents, `factory/jobs/`,
@@ -108,9 +117,9 @@ through it too.
 5. If missing, create `factory/board.json` as `{"jobs": []}`,
    `factory/backlog.md` as `# Backlog`, and `factory/jobs/.gitkeep`. Copy
    `<RUN>/dashboard.html` to `factory/dashboard.html` (replace it on a rerun).
-6. Run `CFG validate REPO`. If it fails, fix the files to match what the owner
-   approved and run it again.
-7. Delete `DRAFT`. Tell the owner which files were written, that nothing is
+6. Run `CFG validate REPO`. It passed on the draft, so a failure means the
+   copy went wrong: report it and stop.
+7. Remove `DRAFT/wt` if it exists (`git worktree remove --force`) and delete `DRAFT`. Tell the owner which files were written, that nothing is
    committed, and how to watch the board:
    `cd factory && python3 -m http.server 8765`.
 8. On a first setup, run `## Foundations` next.
@@ -119,10 +128,13 @@ through it too.
 
 Used by `/factory:scout foundations` and at the end of a first setup.
 
-1. Spawn `factory:foundations-scout` with the checkout of `base`, the absolute
-   path of `factory/`, and from the YAML `commands`, `rules`, `context`, `qa`,
+1. Create a throwaway checkout of `base` for running commands:
+   `git worktree add --detach REPO/.git/factory-scratch <base>`. Spawn
+   `factory:foundations-scout` with that checkout, the absolute path of
+   `factory/`, and from the YAML `commands`, `rules`, `context`, `qa`,
    `scout`, and `reviewers`. Use `models.foundations-scout`. Wait for
-   `factory/scout.md`.
+   `factory/scout.md`, then remove the scratch checkout
+   (`git worktree remove --force REPO/.git/factory-scratch`).
 2. Show the items as the "fix these first" list. Ask the owner which to add
    (one multi-select question, one option per item, the `Why:` line as its
    description).

@@ -3,13 +3,13 @@ name: setup-surveyor
 description: Factory setup stage 1. Reads a repo and writes the facts /factory:setup needs to propose a factory shape, each with where it was found.
 tools: Read, Grep, Glob, Bash, Write
 ---
-You survey one repo so the orchestrator can propose a factory that fits it. Inputs: the repo path, the survey path to write (inside `.git/factory-setup/`), and the current `factory/factory.yaml` path if one exists.
+You survey one repo so the orchestrator can propose a factory that fits it. Inputs: the repo path, a scratch checkout of the same commit, the survey path to write (inside `.git/factory-setup/`), and the current `factory/factory.yaml` path if one exists.
 
 Report facts, not proposals. Cite a file (and line where it helps) for every fact. When you could not find something, say "none found" and where you looked. Skip vendored, generated and build-output directories (`node_modules`, `.venv`, `buck-out`, `build`, `dist`, `third_party`, worktree folders).
 
 Read, at least: `README*`, `CLAUDE.md`, `AGENTS.md`, `.mex/` or similar knowledge folders, package and build manifests (`package.json`, `pyproject.toml`, `Cargo.toml`, `pom.xml`, `BUCK`, `Makefile`, ...), CI workflows, `.claude/agents/` and `.claude/skills/`, `scripts/`, and the top two levels of the source tree. Read the last 30 commit subjects (`git log --oneline -30`) to see what kind of work the repo gets.
 
-Run each candidate test, lint and build command once, with a 10-minute limit, and record whether it runs. Never install dependencies, push, or change files outside the survey path.
+Run each candidate test, lint and build command once, in the scratch checkout and never in the repo itself, with a 10-minute limit, and record whether it runs and how many tests it ran. Read the code from the repo path. Never push, and never change files in the repo path; only the scratch checkout may change.
 
 Write only the survey file, with exactly the sections below. Write it with the Write tool before you finish; content that is only in your reply does not count. Use this format:
 
@@ -24,6 +24,9 @@ Languages and frameworks, with the share of the code each takes.
 
 ## Commands
 One line per command: name, command, runs: yes/no, and the last lines of output.
+For the test command, also the number of tests that ran and whether they
+exercise the main code (a suite that runs zero tests, or only a placeholder,
+is "thin").
 Cover test, lint, format check, type check, build, and how to run the program.
 
 ## Rules docs

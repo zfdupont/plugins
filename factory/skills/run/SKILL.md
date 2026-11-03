@@ -22,8 +22,9 @@ Run this before every command except `/factory:setup`.
    the only line says `not found`, tell the user to run `/factory:setup`.
 2. Read the settings with `CFG get REPO <key>` and keep them for this run:
    `base`, `max_rework`, `max_arbiter_rework`, `worktrees`, `context`, `rules`,
-   `commands`, `merge_gate`, `scout`, `builder`, `reviewers`, `qa`, `escalate`,
-   `related`, `models`. `NO_TESTS` is true when `commands` has no `test` key.
+   `tests`, `commands`, `merge_gate`, `scout`, `builder`, `reviewers`, `qa`,
+   `escalate`, `related`, `models`. `NO_TESTS` is true when `tests` is `none` or
+   `thin`.
 
 Worktrees are `<worktrees>/<job-id>`, resolved against REPO, outside the repo
 so the repo's own commands never see them.
@@ -93,7 +94,7 @@ Stages, in order: `spec`, `build`, `review`, `approval`, `arbitration`,
 `needs-human`, `merged`. A verdict is `pending`, `PASS`, `CHANGES`, or
 `skipped`. `reviews` holds one key per reviewer in `reviewers` order, then `qa`
 if the repo has QA. When a round closes, push `{round, reviews}` onto `history`
-before you reset `reviews`.
+before you start the next round.
 
 ## Job files
 
@@ -128,6 +129,12 @@ short kebab-case slug of the feature.
 
 ## Builder round N
 
+Both runtimes: first record `BEFORE=$(git -C <worktree> rev-parse HEAD)`. When
+the builder has finished, run
+`CFG builder-done <worktree> $BEFORE <job folder>/build.md N`. If it exits
+non-zero, set stage `needs-human` with note "builder run failed: <its output>"
+and stop.
+
 `runtime: claude`:
 - Round 1, or no reachable builder: spawn `factory:builder` named
   `builder-<id>` and record its id in `builder`. Prompt: job folder, worktree,
@@ -136,32 +143,37 @@ short kebab-case slug of the feature.
 - Later rounds: resume the same builder with SendMessage: "Round N. Read
   `jobs/<id>/round-<N-1>/` (and `jobs/<id>/rework-<N>.md` if it exists) and fix
   every CHANGES item. Append `## Round N` to build.md."
-- Wait for it to finish and for `build.md` to have a `## Round N` section.
+- Wait for it to finish, then run the `builder-done` check above. Do not wait
+  further for `build.md`: a builder that stopped without its section has
+  failed the round.
 
 `runtime: command`:
-1. Record `BEFORE=$(git -C <worktree> rev-parse HEAD)`.
-2. Write `jobs/<id>/builder-prompt-N.md` with what a Claude builder would get:
+1. Write `jobs/<id>/builder-prompt-N.md` with what a Claude builder would get:
    - the prompt values above;
    - for round 1, "implement spec.md";
    - for later rounds, the review and rework files to fix;
    - the full text of the `factory:builder` agent's instructions (this plugin's
      `agents/builder.md`, without its frontmatter).
-3. Fill in `builder.command`:
+2. Fill in `builder.command`, single-quoting each filled-in value so paths
+   with spaces survive:
    - `{prompt_file}` is that prompt file (absolute path);
    - `{session}` is `factory-<id>` when `resume: session`, `factory-<id>-r<N>`
      when `resume: fresh`;
    - `{out_prefix}` is `<job folder>/builder-r<N>` (absolute path).
    Record the session id in `builder`.
-4. Run it with Bash from the worktree, in the background. Wait for it to exit.
-5. Run `CFG builder-done <worktree> $BEFORE <job folder>/build.md N`. If it
-   exits non-zero, set stage `needs-human` with note "builder run failed: <its
-   output>", tell the user the logs are at `jobs/<id>/builder-r<N>*`, and stop.
+3. Run it with Bash from the worktree, in the background. Wait for it to exit
+   and record its exit code.
+4. A non-zero exit code: set stage `needs-human` with note "builder run failed:
+   runner exited <code>", tell the user the logs are at
+   `jobs/<id>/builder-r<N>*`, and stop. Exit 0: run the `builder-done` check;
+   on failure, point the user at the same logs.
 
 ## Review round N
 
 1. Create `jobs/<id>/round-N/`. Run `CFG select REPO <base> factory/<id>`.
-   Set stage `review`. In `reviews`, set every `run` name to `pending` and
-   every `skipped` name to `skipped`.
+   If `run` is empty, set stage `needs-human` with note "no reviewer matched
+   this diff" and stop. Otherwise set stage `review` and replace `reviews` with
+   every `run` name as `pending` and every `skipped` name as `skipped`.
 2. Spawn every `run` name in ONE message so they run in parallel. Reviewer
    `<r>` writes `round-N/review-<r>.md`; QA writes `round-N/review-qa.md`. Each
    prompt gives job folder, worktree, branch, `base`, round N, its output file,
@@ -185,7 +197,7 @@ Spawn `factory:approver` with the job folder, worktree, branch, `base`, the
 final round number, the reviewers that ran in it, `rules`, `context`,
 `escalate`, `commands`, and `no_tests: true` when `NO_TESTS`. Read the first
 line of `decision.md`:
-- `APPROVE`: Merge (below), stage `merged`.
+- `APPROVE`: Merge (below).
 - `ESCALATE`: note = the approver's one-line reason, then go to Arbitration.
 
 ## Arbitration
@@ -193,7 +205,8 @@ line of `decision.md`:
 1. Set stage `arbitration`. Spawn `factory:arbiter` with the job folder,
    worktree, branch, `base`, the final round number, the reason it escalated
    (the path of `decision.md`, or "review did not converge after N rounds"),
-   `rules`, `context`, `escalate`, `commands`. Wait for `resolution.md`.
+   `rules`, `context`, `escalate`, `commands`, and `no_tests: true` when
+   `NO_TESTS`. Wait for `resolution.md`.
 2. Read its first two lines. The second line is the card note, prefixed with
    the verdict (`ACCEPT: ...`).
    - `ACCEPT`: stage `needs-human`. Tell the user the arbiter recommends
@@ -211,11 +224,15 @@ line of `decision.md`:
 
 1. Find where `base` is checked out with `git worktree list`. If nowhere, run
    `git worktree add <worktrees>/_base <base>`.
-2. In that checkout: `git merge --no-ff factory/<id> -m "Merge factory/<id>"`.
+2. If that checkout has uncommitted changes (`git status --porcelain` prints
+   anything), set stage `needs-human` with note "base checkout has uncommitted
+   changes" and stop; never stash or discard them. Otherwise, in that checkout:
+   `git merge --no-ff factory/<id> -m "Merge factory/<id>"`.
    If the merge conflicts, run `git merge --abort`, set stage `needs-human` with
    note "merge conflict", and stop.
-3. Run each `merge_gate` command there. If one fails, report it and set
-   `needs-human`; do not revert on your own.
+3. Run each `merge_gate` command there. If one fails, report it, set stage
+   `needs-human` with note "merge gate failed: <command>", and stop; do not
+   revert on your own.
 4. Remove the job worktree (`git worktree remove <worktrees>/<id>`). Keep the
    branch. Never push.
 5. Add follow-ups to the backlog. Read the final round's reviews, `decision.md`,
@@ -225,6 +242,7 @@ line of `decision.md`:
    under a `## Follow-ups from job <id>` heading at the end of the file. Write
    each item as a concrete feature that names the file or command. Tell the
    user how many you added.
+6. Set stage `merged`. Merge is the only place that sets it.
 
 ## next
 
@@ -248,7 +266,8 @@ If there is none, say so and suggest `/factory:scout` and
 
 `<job-id>`. Only for a job at stage `needs-human`. Show the user `resolution.md`
 if it exists, else `decision.md` (or the last round's CHANGES items), in two or
-three lines, then Merge. The user typing the command is the approval; do not
+three lines. If no review round finished (for example, the builder run failed),
+say so in that summary. Then Merge. The user typing the command is the approval; do not
 ask again. In Merge step 5, also add the `- [ ]` follow-ups from an `ACCEPT`
 resolution's `## Next step`. Its spec amendment stays on record in
 `resolution.md`; nobody rewrites `spec.md`.
@@ -261,12 +280,13 @@ existed). Run Arbitration.
 
 ## rework
 
-`<job-id> <note>`:
+`<job-id> <note>`. Only for a job at stage `needs-human`; for any other stage,
+say which stage it is at and stop.
 
 1. Write the note to `jobs/<id>/rework-<round+1>.md`. Recreate the worktree if
    it was removed (`git worktree add <worktrees>/<id> factory/<id>`).
-2. Increment `round`, set `rework` to 0, stage `build`. Rename `decision.md` to
-   `decision-<old round>.md`, and `resolution.md` (if any) to
+2. Increment `round`, set `rework` to 0, stage `build`. Rename `decision.md` (if any)
+   to `decision-<old round>.md`, and `resolution.md` (if any) to
    `resolution-<old round>.md`.
 3. Run the builder for the new round. For `runtime: claude`, resume
    `builder-<id>` if it is reachable from this session, pointing at
