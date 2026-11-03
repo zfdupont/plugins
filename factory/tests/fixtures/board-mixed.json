@@ -1,0 +1,12 @@
+{ "jobs": [
+  { "id": "001-old", "title": "old job with old reviewer names", "stage": "review", "round": 2, "rework": 1,
+    "reviews": { "security": "PASS", "logic": "pending", "maintainability": "CHANGES", "cli": "skipped" },
+    "history": [ { "round": 1, "reviews": { "security": "CHANGES", "ux": "PASS", "ui": "PASS", "code": "CHANGES" } } ],
+    "note": "round 2 under the new lineup" },
+  { "id": "002-arb", "title": "escalated job", "stage": "arbitration", "round": 1, "rework": 0,
+    "reviews": { "logic": "PASS", "qa": "PASS" }, "history": [], "note": "approver escalated: touches a format" },
+  { "id": "003-human", "title": "waiting on owner", "stage": "needs-human", "round": 3, "rework": 2,
+    "reviews": { "logic": "CHANGES" }, "history": [], "note": "ACCEPT: merge as built" },
+  { "id": "004-done", "title": "merged job", "stage": "merged", "round": 1, "rework": 0,
+    "reviews": { "logic": "PASS" }, "history": [] }
+] }

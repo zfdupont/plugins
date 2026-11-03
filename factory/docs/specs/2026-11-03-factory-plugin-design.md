@@ -424,6 +424,8 @@ through the loop with the `pi` builder.
   factory work is committed.
 - A skill looks at the project's current state and the factory settings and
   suggests improvements (`/factory tune`).
+- The dashboard shows `arbitration` and `needs-human` jobs in one BLOCKED
+  column, each card tagged with which one. The board keeps both stages.
 - The work lives in a new `factory/` folder in the `zfdupont/plugins` repo,
   cloned to `~/plugins`.
 
