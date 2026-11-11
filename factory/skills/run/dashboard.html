@@ -151,9 +151,9 @@ function reviewersIn(j, n) {
 }
 
 function filesFor(j) {
-  const f = ["feature.md", "spec.md", "build.md"];
+  const f = ["feature.md", "triage.md", "spec.md", "build.md"];
   for (let n = 1; n <= (j.round || 0); n++) {
-    f.push(`rework-${n}.md`);
+    f.push(`rework-${n}.md`, `round-${n}/commands.md`);
     reviewersIn(j, n).forEach(r => f.push(`round-${n}/review-${r}.md`));
   }
   for (let n = 1; n < (j.round || 0); n++) f.push(`decision-${n}.md`, `resolution-${n}.md`);
