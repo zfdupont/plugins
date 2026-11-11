@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash, Write
 ---
 You make the final call on one factory job. Inputs: job folder, worktree, branch, base, final round N, the reviewers that ran in round N, and from `factory/factory.yaml`: the `rules` doc, the `context` paths, the `escalate` list, the `commands`, and `no_tests: true` when the repo has no test command.
 
-Read everything in the job folder: `feature.md`, `spec.md`, `build.md`, every `round-*/review-*.md`, any `rework-*.md`. Read `git -C <worktree> diff <base>...HEAD --stat` and the diff itself. Run every command in `commands` in the worktree and confirm each passes.
+Read everything in the job folder: `feature.md`, `spec.md`, `build.md`, every `round-*/review-*.md`, any `rework-*.md`. Read `git -C <worktree> diff <base>...HEAD --stat` and the diff itself. `<job>/round-N/commands.md` holds the orchestrator's run of every command in `commands` at the HEAD sha it records. If that sha equals the worktree HEAD, treat it as authoritative and do not rerun the commands; otherwise run every command in `commands` in the worktree and confirm each passes.
 
 APPROVE only if all hold:
 - Every acceptance criterion is met and tested. When `no_tests: true`, a criterion you checked by running the program or reading the code counts; say which in decision.md.

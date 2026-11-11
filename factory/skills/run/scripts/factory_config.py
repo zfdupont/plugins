@@ -22,15 +22,21 @@ import yaml
 KNOWN_KEYS = {
     "version", "base", "max_rework", "max_arbiter_rework", "worktrees", "context",
     "rules", "tests", "commands", "merge_gate", "scout", "builder", "reviewers", "qa",
-    "escalate", "related", "models",
+    "escalate", "related", "models", "lanes",
 }
+LANE_NAMES = {"trivial"}
+LANE_KEYS = {"paths", "max_changed_lines", "skip"}
+LANE_SKIPS = {"spec", "approval"}
+ESCALATE_KEYS = {"when", "paths"}
+DEFAULT_MAX_CHANGED_LINES = 40
+THIN_TESTS_PATHS = ["src/", "scripts/"]
 BUILDER_KEYS = {"runtime", "command", "resume"}
 QA_KEYS = {"agent", "paths"}
 SCOUT_KEYS = {"todo_paths", "docs", "checks"}
 REVIEWER_KEYS = {"name", "why", "paths", "model"}
 MODEL_ROLES = {
     "spec-writer", "builder", "reviewers", "approver", "arbiter", "scout",
-    "setup-surveyor", "foundations-scout", "tuner",
+    "setup-surveyor", "foundations-scout", "tuner", "triage",
 }
 TESTS_STATES = ("none", "thin", "ok")
 NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
@@ -64,6 +70,7 @@ def load(repo: Path) -> dict:
         cfg.setdefault(key, [])
     cfg.setdefault("models", {})
     cfg.setdefault("scout", {})
+    cfg["lanes"] = cfg.get("lanes") or {}
     return cfg
 
 
@@ -119,8 +126,39 @@ def validate(repo: Path) -> list[str]:
     tests = raw.get("tests")
     if tests is not None and tests not in TESTS_STATES:
         errors.append("factory.yaml: tests must be none, thin or ok")
-    for key in ("context", "escalate"):
-        string_list(key)
+    string_list("context")
+
+    escalate = raw.get("escalate")
+    if escalate is not None and not isinstance(escalate, list):
+        errors.append("factory.yaml: escalate must be a list")
+    for i, entry in enumerate(escalate if isinstance(escalate, list) else []):
+        if isinstance(entry, str):
+            continue
+        if not isinstance(entry, dict):
+            errors.append(f"factory.yaml: escalate[{i}] must be a string or a mapping with when and paths")
+            continue
+        errors.extend(f"factory.yaml: unknown key 'escalate[{i}].{k}'" for k in entry if k not in ESCALATE_KEYS)
+        if not (isinstance(entry.get("when"), str) and entry["when"]):
+            errors.append(f"factory.yaml: escalate[{i}] needs a when")
+        if "paths" in entry and not is_path_list(entry["paths"]):
+            errors.append(f"factory.yaml: escalate[{i}] paths must be a non-empty list of strings")
+
+    for lane, spec in mapping("lanes").items():
+        if lane not in LANE_NAMES:
+            errors.append(f"factory.yaml: unknown key 'lanes.{lane}'")
+            continue
+        if not isinstance(spec, dict):
+            errors.append(f"factory.yaml: lanes.{lane} must be a mapping")
+            continue
+        errors.extend(f"factory.yaml: unknown key 'lanes.{lane}.{k}'" for k in spec if k not in LANE_KEYS)
+        if not is_path_list(spec.get("paths")):
+            errors.append(f"factory.yaml: lanes.{lane}.paths must be a non-empty list of strings")
+        limit = spec.get("max_changed_lines", DEFAULT_MAX_CHANGED_LINES)
+        if not (isinstance(limit, int) and not isinstance(limit, bool) and limit >= 0):
+            errors.append(f"factory.yaml: lanes.{lane}.max_changed_lines must be a whole number")
+        skip = spec.get("skip", [])
+        if not (isinstance(skip, list) and all(v in LANE_SKIPS for v in skip)):
+            errors.append(f"factory.yaml: lanes.{lane}.skip must be a list of spec, approval")
 
     commands = raw.get("commands")
     if not isinstance(commands, dict) or (not commands and tests != "none"):
@@ -258,10 +296,71 @@ def select(cfg: dict, changed: list[str]) -> dict:
     return {"run": run, "skipped": skipped}
 
 
+def escalate_paths(cfg: dict) -> list[tuple[str, list[str]]]:
+    """(when, paths) for each escalate entry that can be checked mechanically."""
+    return [(e["when"], e["paths"]) for e in cfg.get("escalate") or [] if isinstance(e, dict) and e.get("paths")]
+
+
+def escalate_hit(cfg: dict, changed: list[str]) -> dict:
+    """Which escalate entries stop an automatic approval for this diff.
+
+    hit: entries with paths that match, and the thin-tests rule when the diff
+    touches src/ or scripts/. unchecked: plain-string entries, which only the
+    approver can judge."""
+    hit = []
+    for when, paths in escalate_paths(cfg):
+        files = [f for f in changed if any(glob_match(p, f) for p in paths)]
+        if files:
+            hit.append({"when": when, "files": files})
+    if cfg.get("tests", "ok") != "ok":
+        files = [f for f in changed if any(glob_match(p, f) for p in THIN_TESTS_PATHS)]
+        if files:
+            hit.append({"when": f"tests is {cfg['tests']} and the diff touches src/ or scripts/", "files": files})
+    unchecked = [e for e in cfg.get("escalate") or [] if isinstance(e, str)]
+    return {"hit": hit, "unchecked": unchecked}
+
+
+def lane(cfg: dict, changed: list[str], lines: int) -> dict:
+    """Which lane a diff belongs to: trivial only when the repo defines the
+    lane and the diff stays inside its paths, size and escalate paths."""
+    spec = (cfg.get("lanes") or {}).get("trivial")
+    if not spec:
+        return {"lane": "full", "why": "no trivial lane configured"}
+    if not changed:
+        return {"lane": "full", "why": "no changed files"}
+    outside = [f for f in changed if not any(glob_match(p, f) for p in spec["paths"])]
+    if outside:
+        return {"lane": "full", "why": f"outside lane paths: {', '.join(outside[:5])}"}
+    limit = spec.get("max_changed_lines", DEFAULT_MAX_CHANGED_LINES)
+    if lines > limit:
+        return {"lane": "full", "why": f"{lines} changed lines exceeds {limit}"}
+    for when, paths in escalate_paths(cfg):
+        hits = [f for f in changed if any(glob_match(p, f) for p in paths)]
+        if hits:
+            return {"lane": "full", "why": f"escalate path matched ({when}): {', '.join(hits[:5])}"}
+    return {"lane": "trivial", "why": f"{len(changed)} files, {lines} lines, all inside lane paths", "skip": spec.get("skip", [])}
+
+
 def git_out(repo: Path, *args: str) -> str:
     return subprocess.run(
         ["git", "-C", str(repo), *args], check=True, capture_output=True, text=True
     ).stdout
+
+
+def changed_files(repo: Path, base: str, head: str) -> list[str]:
+    out = git_out(repo, "diff", "-z", "--no-renames", "--name-only", f"{base}...{head}")
+    return [f for f in out.split("\0") if f]
+
+
+def changed_lines(repo: Path, base: str, head: str) -> int:
+    """Added plus deleted lines; a binary file counts as 1000."""
+    total = 0
+    for rec in git_out(repo, "diff", "-z", "--no-renames", "--numstat", f"{base}...{head}").split("\0"):
+        if not rec:
+            continue
+        added, deleted, _ = rec.split("\t", 2)
+        total += 1000 if added == "-" else int(added) + int(deleted)
+    return total
 
 
 IN_FLIGHT = ("spec", "build", "review", "approval", "arbitration")
@@ -313,6 +412,10 @@ def main(argv: list[str]) -> int:
     p = sub.add_parser("select")
     for arg in ("repo", "base", "head"):
         p.add_argument(arg)
+    for name in ("lane", "escalate-hit"):
+        p = sub.add_parser(name)
+        for arg in ("repo", "base", "head"):
+            p.add_argument(arg)
     p = sub.add_parser("builder-done")
     for arg in ("worktree", "before_sha", "build_md", "round"):
         p.add_argument(arg)
@@ -339,8 +442,16 @@ def main(argv: list[str]) -> int:
         return 0
     if args.cmd == "select":
         repo = Path(args.repo)
-        changed = [f for f in git_out(repo, "diff", "-z", "--no-renames", "--name-only", f"{args.base}...{args.head}").split("\0") if f]
-        print(json.dumps(select(load(repo), changed)))
+        print(json.dumps(select(load(repo), changed_files(repo, args.base, args.head))))
+        return 0
+    if args.cmd == "lane":
+        repo = Path(args.repo)
+        result = lane(load(repo), changed_files(repo, args.base, args.head), changed_lines(repo, args.base, args.head))
+        print(json.dumps(result))
+        return 0
+    if args.cmd == "escalate-hit":
+        repo = Path(args.repo)
+        print(json.dumps(escalate_hit(load(repo), changed_files(repo, args.base, args.head))))
         return 0
     return 2
 

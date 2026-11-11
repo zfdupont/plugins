@@ -14,6 +14,8 @@ Skills never parse this file themselves. They call
 | `validate <repo>` | `ok` and exit 0, or one `factory.yaml: ...` line per problem and exit 1 |
 | `get <repo> <dotted.key>` | the value as JSON, defaults applied; `null` when missing |
 | `select <repo> <base> <head>` | `{"run": [...], "skipped": [...]}` for the round |
+| `lane <repo> <base> <head>` | `{"lane": "trivial"\|"full", "why": "...", "skip": [...]}` for the diff (`skip` only for `trivial`) |
+| `escalate-hit <repo> <base> <head>` | `{"hit": [{"when", "files"}], "unchecked": [...]}`: `escalate` entries whose `paths` match the diff (plus the thin-tests rule), and the plain-string entries only the approver can judge |
 | `builder-done <worktree> <before_sha> <build_md> <round>` | `done` and exit 0, or the reason and exit 1 |
 | `migration-check <repo> [--loop-file <path>]` | `ok` and exit 0, or one line per blocker (an active loop in the given state file, a dirty tree, a job in flight) and exit 1 |
 
@@ -37,9 +39,10 @@ Any key not in this table is an error.
 | `builder` | map | `{runtime: claude, resume: session}` | see Builder |
 | `reviewers` | list | required, non-empty | see Reviewers |
 | `qa` | `null` or map | `null` | `agent` (repo agent name), optional `paths` |
-| `escalate` | list of strings | `[]` | the approver escalates on any of these, even when reviews pass |
+| `escalate` | list of strings or `{when, paths}` | `[]` | the approver escalates on any of these, even when reviews pass. A string is prose only the approver can judge. An object adds `paths` (globs, same rules as Reviewers): when the diff matches none of them and the other auto-approve conditions hold, the orchestrator approves without the approver. See Escalate |
+| `lanes` | map | `{}` | optional fast lanes. Only `trivial` exists. See Lanes |
 | `related` | list of `{path, contract}` | `[]` | sibling repos; reviewers named `contract*` get them in their prompt |
-| `models` | map role to `<model> [effort]` | `{}` | roles: `spec-writer`, `builder`, `reviewers`, `approver`, `arbiter`, `scout`, `setup-surveyor`, `foundations-scout`, `tuner`; model is `opus`, `sonnet`, `haiku`, `fable` or `inherit`; effort is `low`, `medium`, `high`, `xhigh` or `max` |
+| `models` | map role to `<model> [effort]` | `{}` | roles: `spec-writer`, `builder`, `reviewers`, `approver`, `arbiter`, `scout`, `setup-surveyor`, `foundations-scout`, `tuner`, `triage`; model is `opus`, `sonnet`, `haiku`, `fable` or `inherit`; effort is `low`, `medium`, `high`, `xhigh` or `max` |
 
 ## Builder
 
@@ -89,6 +92,55 @@ Renames count under both names: moving `web/api.py` to `legacy/api.py` runs a
 
 At least one reviewer must have no `paths`, so every round has a reviewer.
 
+## Escalate
+
+Each entry is a string or `{when: "<prose>", paths: [globs]}`.
+
+Auto-approve: after a passing final round, the orchestrator approves a job
+without spawning the approver when all of these hold:
+
+- every review passed;
+- the `merge_gate` commands pass when the orchestrator runs them in the job
+  worktree;
+- `CFG escalate-hit` lists nothing under `hit` and nothing under `unchecked`.
+
+`hit` holds the object entries whose `paths` match the diff. It also holds the
+thin-tests rule: when `tests` is `thin` or `none`, a diff that touches `src/` or
+`scripts/` always goes to the approver. `unchecked` holds every plain-string
+entry, so a repo that wants auto-approve converts its string entries to the
+object form. Leave one as a string to force the approver whenever that rule
+cannot be expressed as paths (for example, deleted tests). With only string
+entries, nothing changes: the approver always runs.
+
+`decision.md` for an auto-approved job reads `APPROVE`, then
+`auto: no escalate path matched, merge_gate green`.
+
+## Lanes
+
+```yaml
+lanes:
+  trivial:
+    paths: ["*.md", "test/**"]   # required, globs
+    max_changed_lines: 40        # optional, default 40
+    skip: [spec, approval]       # optional, default []
+```
+
+Without `lanes`, `/factory:run` never triages and every job takes the full
+path. With it, a `factory:triage` agent (`models.triage`) reads `feature.md`
+and predicts `LANE: trivial` or `LANE: full`. A `trivial` job with `spec` in
+`skip` gets `feature.md` copied to `spec.md` instead of a spec-writer run.
+After the build, `CFG lane` classifies the real diff: `trivial` only if every
+changed file matches `paths`, added plus deleted lines (a binary file counts
+as 1000) stay within `max_changed_lines`, and no `escalate` entry's `paths`
+match. A job triaged `trivial` whose diff is `full` is promoted: the full
+reviewer set and the approver run, and the missing spec is not backfilled.
+`approval` in `skip` lets a job whose diff is `trivial` auto-approve even when
+`escalate` has plain-string entries (it still needs passing reviews, a green
+`merge_gate`, and no `hit`).
+
+The board job records `lane` (`trivial` or `full`); the dashboard shows it as a
+chip.
+
 ## Example
 
 ```yaml
@@ -122,10 +174,14 @@ reviewers:
 qa: null
 escalate:
   - changes an on-disk format without a version bump
-  - adds a dependency, changes the build toolchain, or deletes tests
+  - {when: adds a dependency or changes the build toolchain, paths: [pyproject.toml, Makefile]}
+  - deletes tests
+lanes:
+  trivial: {paths: ["*.md", "docs/**"], max_changed_lines: 40, skip: [spec, approval]}
 related: []
 models:
   reviewers: sonnet high
   approver: opus high
   arbiter: opus max
+  triage: haiku
 ```

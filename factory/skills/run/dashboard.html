@@ -51,6 +51,8 @@ h1 { font-size: 17px; margin: 0; font-weight: 600; }
   background: var(--pend-bg); color: var(--pend); }
 .chip.PASS { background: var(--pass-bg); color: var(--pass); }
 .chip.CHANGES { background: var(--chg-bg); color: var(--chg); }
+.chip.lane.trivial { background: var(--pass-bg); color: var(--pass); }
+.chip.lane.full { background: none; color: var(--pend); border: 1px solid var(--line); }
 .chip.skipped { background: none; color: var(--pend); border: 1px dashed var(--line);
   text-decoration: line-through; }
 .empty { color: var(--muted); font-size: 12px; padding: 4px 2px; }
@@ -109,7 +111,7 @@ function card(j) {
     rows.push(roundRow(j.round, j.reviews));
   return `<div class="card ${esc(j.stage)}" data-id="${esc(j.id)}">
     ${TAGS[j.stage] ? `<div class="tag">${TAGS[j.stage]}</div>` : ""}
-    <div class="id">${esc(j.id)}</div>
+    <div class="id">${esc(j.id)}${j.lane ? ` <span class="chip lane ${esc(j.lane)}" title="lane: ${esc(j.lane)}">${esc(j.lane)}</span>` : ""}</div>
     <div class="title">${esc(j.title || j.id)}</div>
     ${rows.join("")}
     ${j.note ? `<div class="note">${esc(j.note)}</div>` : ""}

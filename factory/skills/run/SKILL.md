@@ -23,7 +23,7 @@ Run this before every command except `/factory:setup`.
 2. Read the settings with `CFG get REPO <key>` and keep them for this run:
    `base`, `max_rework`, `max_arbiter_rework`, `worktrees`, `context`, `rules`,
    `tests`, `commands`, `merge_gate`, `scout`, `builder`, `reviewers`, `qa`,
-   `escalate`, `related`, `models`. `NO_TESTS` is true when `tests` is `none` or
+   `escalate`, `related`, `models`, `lanes`. `NO_TESTS` is true when `tests` is `none` or
    `thin`.
 
 Worktrees are `<worktrees>/<job-id>`, resolved against REPO, outside the repo
@@ -31,11 +31,11 @@ so the repo's own commands never see them.
 
 ## Spawning agents
 
-- Plugin agents: `factory:spec-writer`, `factory:builder`, `factory:approver`,
+- Plugin agents: `factory:triage`, `factory:spec-writer`, `factory:builder`, `factory:approver`,
   `factory:arbiter`, `factory:scout`. Reviewer `<r>` is the repo agent
   `factory-review-<r>`; QA is the repo agent named by `qa.agent`.
-- Model and effort: look up the role in `models` (`spec-writer`, `builder`,
-  `approver`, `arbiter`, `scout`; every reviewer and QA use `reviewers`, unless
+- Model and effort: look up the role in `models` (`triage`, `spec-writer`,
+  `builder`, `approver`, `arbiter`, `scout`; every reviewer and QA use `reviewers`, unless
   the reviewer entry has its own `model`). A value `<model> <effort>` maps to
   the Agent tool's `model` and `effort`. `inherit`, or no entry, omits them.
 - Every prompt carries absolute paths and these values, never conversation
@@ -44,6 +44,11 @@ so the repo's own commands never see them.
   - The approver and arbiter also get `escalate` and `no_tests: true` when
     `NO_TESTS`. The approver also gets the list of reviewers that ran in the
     final round.
+  - Every reviewer and the approver also get `<job folder>/round-N/commands.md`
+    with: "It is the authoritative result of every command at the HEAD sha it
+    records. Do not rerun commands unless the sha differs from the worktree
+    HEAD; if you do rerun, run only the command that bears on your checklist
+    and only the tests you cite. A failing command in it is a CHANGES item."
   - Every reviewer whose name starts with `contract` also gets every `related`
     entry (path and contract).
 
@@ -51,14 +56,16 @@ so the repo's own commands never see them.
 
 ```
 feature
+  -> triage (only if `lanes`)           writes triage.md; LANE: trivial skips spec-writer
   -> spec-writer                        writes spec.md
   -> builder                            writes build.md, commits on factory/<job-id>
+  -> orchestrator runs `commands`       writes round-N/commands.md
   -> review round N, in parallel:       writes round-N/review-<r>.md
        every reviewer and QA that `CFG select` picks for this diff
   -> WAIT FOR ALL picked files
        any CHANGES and rework < max_rework  -> builder again, round N+1
        any CHANGES and rework = max_rework  -> arbiter
-       all PASS                             -> approver
+       all PASS                             -> approver, or auto-approve (below)
   -> approver                           writes decision.md
        APPROVE   -> merge factory/<job-id> into base, stage merged
        ESCALATE  -> arbiter
@@ -80,6 +87,7 @@ after every state change (read it, change the one job, write it back).
   "branch": "factory/004-status-json",
   "worktree": "<worktrees>/004-status-json",
   "builder": "<agent id or name used for SendMessage, or the runner session id>",
+  "lane": "full",
   "stage": "review",
   "round": 2,
   "rework": 1,
@@ -89,6 +97,9 @@ after every state change (read it, change the one job, write it back).
   "updated": "2026-10-28T14:03:00Z"
 } ] }
 ```
+
+`lane` is `trivial` or `full`; omit it when the repo has no `lanes`. The
+dashboard shows it as a chip.
 
 Stages, in order: `spec`, `build`, `review`, `approval`, `arbitration`,
 `needs-human`, `merged`. A verdict is `pending`, `PASS`, `CHANGES`, or
@@ -101,13 +112,15 @@ before you start the next round.
 ```
 factory/jobs/<job-id>/
   feature.md            the request (you write it)
-  spec.md               spec-writer
+  triage.md             triage (only when the repo has `lanes`)
+  spec.md               spec-writer (or a copy of feature.md for a trivial job)
   build.md              builder (one "## Round N" section per round)
   builder-prompt-N.md   you, for a command builder
   builder-rN-*          a command builder's logs
+  round-N/commands.md   you: the result of every command at that round's HEAD
   round-N/review-<r>.md one per reviewer that ran, plus review-qa.md
   rework-N.md           human or arbiter feedback for /factory:rework (you write it)
-  decision.md           approver
+  decision.md           approver (or you, for an auto-approval)
   resolution.md         arbiter (after an escalation)
 ```
 
@@ -120,7 +133,15 @@ short kebab-case slug of the feature.
 
 1. Pick the job id. Write `jobs/<id>/feature.md` with the feature text. Add the
    job to the board at stage `spec`, round 0, rework 0.
-2. Spawn `factory:spec-writer` with the job folder and REPO. Wait for `spec.md`.
+1b. Triage. If `lanes` is empty, skip this step. Otherwise spawn
+   `factory:triage` with the job folder, REPO, `context`, `escalate` and
+   `lanes.trivial`. Wait for `triage.md` and read its first line. `LANE:
+   trivial` sets board `lane` to `trivial`; anything else, or a missing file,
+   sets it to `full`.
+2. If the lane is `trivial` and `lanes.trivial.skip` has `spec`, write
+   `spec.md` as the line `# Trivial lane: build this request as written, no
+   separate spec.` followed by `feature.md` verbatim. Otherwise spawn
+   `factory:spec-writer` with the job folder and REPO and wait for `spec.md`.
 3. Create the branch and worktree:
    `git worktree add -b factory/<id> <worktrees>/<id> <base>`.
    Set stage `build`, round 1.
@@ -170,7 +191,17 @@ and stop.
 
 ## Review round N
 
-1. Create `jobs/<id>/round-N/`. Run `CFG select REPO <base> factory/<id>`.
+1. Create `jobs/<id>/round-N/`.
+   - Lane check. If `lanes` is not empty, run `CFG lane REPO <base>
+     factory/<id>` on the real diff and set board `lane` to its answer. If the
+     triage said `trivial` and this says `full`, the job is promoted: note
+     "promoted to full: <why>", and it takes the full path from here (the full
+     reviewer set and the approver; the missing spec is not backfilled).
+   - Commands. Run every `commands` entry once in the worktree and write
+     `round-N/commands.md`: the HEAD sha (`git -C <worktree> rev-parse HEAD`),
+     then per command its text, exit code, and last 20 lines of output. Reviewers
+     and the approver read this file instead of rerunning.
+   - Run `CFG select REPO <base> factory/<id>`.
    If `run` is empty, set stage `needs-human` with note "no reviewer matched
    this diff" and stop. Otherwise set stage `review` and replace `reviews` with
    every `run` name as `pending` and every `skipped` name as `skipped`.
@@ -193,10 +224,18 @@ and stop.
 
 ## Approval
 
+First try to auto-approve. Run each `merge_gate` command in the worktree and
+run `CFG escalate-hit REPO <base> factory/<id>`. Approve without the approver
+when all reviews passed, every `merge_gate` command passed, and `hit` is empty
+and `unchecked` is empty. `unchecked` may be non-empty when board `lane` is
+`trivial` and `lanes.trivial.skip` has `approval`. To approve, write
+`decision.md` as `APPROVE`, then the line `auto: no escalate path matched,
+merge_gate green`, and go to Merge. Otherwise spawn the approver:
+
 Spawn `factory:approver` with the job folder, worktree, branch, `base`, the
 final round number, the reviewers that ran in it, `rules`, `context`,
-`escalate`, `commands`, and `no_tests: true` when `NO_TESTS`. Read the first
-line of `decision.md`:
+`escalate`, `commands`, `round-N/commands.md`, and `no_tests: true` when
+`NO_TESTS`. Read the first line of `decision.md`:
 - `APPROVE`: Merge (below).
 - `ESCALATE`: note = the approver's one-line reason, then go to Arbitration.
 
@@ -299,7 +338,7 @@ say which stage it is at and stop.
 - Prompts to agents contain paths and values, never conversation content.
   Anything an agent needs goes in a file first.
 - Each agent writes only its own file. You write `feature.md`, `rework-N.md`,
-  `builder-prompt-N.md`, `board.json`, and `backlog.md`; `scout` writes
+  `builder-prompt-N.md`, `board.json`, and `backlog.md`, `round-N/commands.md`, and `decision.md` for an auto-approval; `triage` writes `triage.md`; `scout` writes
   `scout.md`; `arbiter` writes `resolution.md`.
 - Reviews start with `VERDICT: PASS` or `VERDICT: CHANGES`; `decision.md`
   starts with `APPROVE` or `ESCALATE`; `resolution.md` starts with `ACCEPT`,
