@@ -1,6 +1,6 @@
 ---
 name: approve
-description: Merge a factory job that is waiting on the owner. Use for /factory:approve <job-id>.
+description: Merge one or more factory jobs that are waiting on the owner. Use for /factory:approve <job-id> [<job-id> ...].
 ---
 
 Read `../run/SKILL.md`, resolved against this skill's base directory. Treat

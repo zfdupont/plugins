@@ -32,7 +32,8 @@ so the repo's own commands never see them.
 ## Spawning agents
 
 - Plugin agents: `factory:triage`, `factory:spec-writer`, `factory:builder`, `factory:approver`,
-  `factory:arbiter`, `factory:scout`. Reviewer `<r>` is the repo agent
+  `factory:arbiter`, `factory:scout`. A milestone job (see `## milestone`) uses only
+  the builder, the reviewers and, on rework, the arbiter. Reviewer `<r>` is the repo agent
   `factory-review-<r>`; QA is the repo agent named by `qa.agent`.
 - Model and effort: look up the role in `models` (`triage`, `spec-writer`,
   `builder`, `approver`, `arbiter`, `scout`; every reviewer and QA use `reviewers`, unless
@@ -98,8 +99,8 @@ after every state change (read it, change the one job, write it back).
 } ] }
 ```
 
-`lane` is `trivial` or `full`; omit it when the repo has no `lanes`. The
-dashboard shows it as a chip.
+`lane` is `trivial` or `full`; omit it when the repo has no `lanes`. A milestone
+job (see `## milestone`) has lane `milestone`. The dashboard shows it as a chip.
 
 Stages, in order: `spec`, `build`, `review`, `approval`, `arbitration`,
 `needs-human`, `merged`. A verdict is `pending`, `PASS`, `CHANGES`, or
@@ -228,7 +229,13 @@ First try to auto-approve. Run each `merge_gate` command in the worktree and
 run `CFG escalate-hit REPO <base> factory/<id>`. Approve without the approver
 when all reviews passed, every `merge_gate` command passed, and `hit` is empty
 and `unchecked` is empty. `unchecked` may be non-empty when board `lane` is
-`trivial` and `lanes.trivial.skip` has `approval`. To approve, write
+`trivial` and `lanes.trivial.skip` has `approval`. Check the plain string
+`deletes tests` yourself instead of leaving it to the approver: it is satisfied
+when `git -C <worktree> diff --diff-filter=D --name-only <base>...HEAD` lists no
+test file and `git -C <worktree> diff <base>...HEAD` removes no `expect(` or
+`it(` line without adding one back; drop it from `unchecked` when so. A job with
+lane `milestone` never spawns the approver; see `## milestone` for what it does
+instead. To approve, write
 `decision.md` as `APPROVE`, then the line `auto: no escalate path matched,
 merge_gate green`, and go to Merge. Otherwise spawn the approver:
 
@@ -283,6 +290,51 @@ final round number, the reviewers that ran in it, `rules`, `context`,
    user how many you added.
 6. Set stage `merged`. Merge is the only place that sets it.
 
+## milestone
+
+`/factory:milestone <N> [<N> ...]`. One milestone is one job. Use it when
+`factory/milestones.md` (or the file the repo's docs name) holds a `## M<N>.`
+section with a `**Steps:**` list. It skips triage, the spec-writer and the
+approver, uses one builder for every step and one review pass for the whole
+diff, and auto-merges unless the milestone text explicitly flags a step.
+
+For each `<N>`, in the order given (a later milestone depends on the earlier one
+being merged, so never run two at once; stop the whole list at the first job
+that does not reach `merged`):
+
+1. Job id `NNN-m<N>-<slug>`. Write `jobs/<id>/feature.md`: the `## M<N>.`
+   section verbatim, preceded by the file's `## Conventions` section. Add the
+   job to the board with lane `milestone`, stage `build`, round 1.
+2. Write `spec.md` as the line `# Milestone job: build every step in order, one
+   commit per step, no separate spec.` followed by `feature.md` verbatim. Create
+   the branch and worktree as in `## /factory:run` step 3.
+3. Run the builder (`## Builder round N`) with this added to its prompt:
+   "This is a milestone job. Implement every step of the Steps list in order,
+   one commit per step, and run the commands after the last step. Write one
+   `## Round 1` section in build.md with a line per step. Do not run mutation
+   or fault-injection experiments unless a step asks for them."
+4. Run a review round (`## Review round N`). Skip its lane check; the lane stays
+   `milestone`. Reviewers that `CFG select` picks run exactly as for any job.
+5. Close the round as usual: CHANGES go to rework (builder resumed), and past
+   `max_rework` to the arbiter.
+6. All PASS: stage `approval`. Never spawn `factory:approver`.
+   - Flagged: if the `## M<N>.` section of `feature.md` (not the Conventions
+     text before it, which mentions the marker) contains the text `[ESCALATE`, set stage
+     `needs-human` with a note listing each flagged step and its reason, and
+     stop the list. The owner runs `/factory:approve <id>` when satisfied.
+     This is the only reason a milestone job stops for a human.
+   - Otherwise run the auto-approve checks from `## Approval` (merge gate on
+     the worktree, `escalate-hit`, the mechanical `deletes tests` check). If all
+     hold, write `decision.md` as `APPROVE` then the line `auto: milestone, no
+     flagged step, merge_gate green`, and go to Merge. If `escalate-hit` returns
+     a `hit` (a path-based `escalate` entry matched), set stage `needs-human`
+     with the entry's `when` as the note and stop the list.
+7. After Merge, print the milestone's `**Observable in game:**` paragraph as the
+   owner check, then continue to the next `<N>` only if the user passed several
+   and none of the earlier ones has an owner check the user has not already
+   confirmed; otherwise stop and say which `/factory:milestone` to run after the
+   check.
+
 ## next
 
 Read `factory/backlog.md`. Take the first `- [ ]` item (items under
@@ -303,12 +355,16 @@ If there is none, say so and suggest `/factory:scout` and
 
 ## approve
 
-`<job-id>`. Only for a job at stage `needs-human`. Show the user `resolution.md`
-if it exists, else `decision.md` (or the last round's CHANGES items), in two or
-three lines. If no review round finished (for example, the builder run failed),
-say so in that summary. Then Merge. The user typing the command is the approval; do not
-ask again. In Merge step 5, also add the `- [ ]` follow-ups from an `ACCEPT`
-resolution's `## Next step`. Its spec amendment stays on record in
+`<job-id> [<job-id> ...]`. Each must be at stage `needs-human`; for any other
+stage, say which stage it is at and skip that id. With several ids, handle them
+in the order given and stop at the first one that fails Merge, leaving the rest
+at `needs-human`. For each job, show the user `resolution.md` if it exists, else
+`decision.md` (or the last round's CHANGES items, or for a milestone job the
+flagged steps and the review verdict), in two or three lines per job; if no
+review round finished (for example, the builder run failed), say so. Then Merge
+that job; the merge gate runs after each one. The user typing the command is the
+approval; do not ask again. In Merge step 5, also add the `- [ ]` follow-ups from
+an `ACCEPT` resolution's `## Next step`. Its spec amendment stays on record in
 `resolution.md`; nobody rewrites `spec.md`.
 
 ## arbitrate
@@ -338,7 +394,7 @@ say which stage it is at and stop.
 - Prompts to agents contain paths and values, never conversation content.
   Anything an agent needs goes in a file first.
 - Each agent writes only its own file. You write `feature.md`, `rework-N.md`,
-  `builder-prompt-N.md`, `board.json`, and `backlog.md`, `round-N/commands.md`, and `decision.md` for an auto-approval; `triage` writes `triage.md`; `scout` writes
+  `builder-prompt-N.md`, `board.json`, and `backlog.md`, `round-N/commands.md`, and `decision.md` for an auto-approval (including a milestone job's); `triage` writes `triage.md`; `scout` writes
   `scout.md`; `arbiter` writes `resolution.md`.
 - Reviews start with `VERDICT: PASS` or `VERDICT: CHANGES`; `decision.md`
   starts with `APPROVE` or `ESCALATE`; `resolution.md` starts with `ACCEPT`,
