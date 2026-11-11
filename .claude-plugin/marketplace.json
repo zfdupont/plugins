@@ -18,7 +18,7 @@
       "name": "factory",
       "source": "./factory",
       "description": "A spec-to-merge software factory you set up per repo. Start with /factory:setup.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "category": "development"
     }
   ]
