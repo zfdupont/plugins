@@ -32,11 +32,11 @@ so the repo's own commands never see them.
 ## Spawning agents
 
 - Plugin agents: `factory:triage`, `factory:spec-writer`, `factory:builder`, `factory:approver`,
-  `factory:arbiter`, `factory:scout`. A milestone job (see `## milestone`) uses only
+  `factory:arbiter`, `factory:scout`, `factory:roadmapper`. A milestone job (see `## milestone`) uses only
   the builder, the reviewers and, on rework, the arbiter. Reviewer `<r>` is the repo agent
   `factory-review-<r>`; QA is the repo agent named by `qa.agent`.
 - Model and effort: look up the role in `models` (`triage`, `spec-writer`,
-  `builder`, `approver`, `arbiter`, `scout`; every reviewer and QA use `reviewers`, unless
+  `builder`, `approver`, `arbiter`, `scout`, `roadmapper`; every reviewer and QA use `reviewers`, unless
   the reviewer entry has its own `model`). A value `<model> <effort>` maps to
   the Agent tool's `model` and `effort`. `inherit`, or no entry, omits them.
 - Every prompt carries absolute paths and these values, never conversation
@@ -329,11 +329,65 @@ that does not reach `merged`):
      flagged step, merge_gate green`, and go to Merge. If `escalate-hit` returns
      a `hit` (a path-based `escalate` entry matched), set stage `needs-human`
      with the entry's `when` as the note and stop the list.
-7. After Merge, print the milestone's `**Observable in game:**` paragraph as the
+7. After Merge, print the milestone's `**Observable:**` (or `**Observable in game:**`) paragraph as the
    owner check, then continue to the next `<N>` only if the user passed several
    and none of the earlier ones has an owner check the user has not already
    confirmed; otherwise stop and say which `/factory:milestone` to run after the
    check.
+
+## roadmap
+
+`/factory:roadmap`. Finds long-term goals, interviews the owner, and writes the
+milestones that `## milestone` runs. You do the interviewing; the roadmapper
+only reads and writes files.
+
+1. Survey. Create a throwaway checkout of `base`
+   (`git worktree add --detach REPO/.git/factory-scratch <base>`) and spawn
+   `factory:roadmapper` in phase `survey` with that checkout, the absolute
+   path of `factory/`, `context`, `rules`, `commands`, `scout`, `escalate`.
+   Wait for `factory/roadmap-candidates.md`, then remove the scratch checkout.
+   If it holds "No long-term goals found.", say so and stop.
+2. Interview, in three steps. Never answer for the owner.
+   a. Ask which goals to pursue: one multi-select question, one option per
+      goal, its `Outcome:` line as the description. The owner can add a goal of
+      their own with Other; treat it as a goal with no questions yet.
+   b. For the chosen goals, ask each goal's `Questions:` with the question
+      tool, up to 4 questions per call, options as the roadmapper gave them
+      with its recommendation first. Name the goal in each question.
+   c. Ask once, free-form: constraints, deadlines, things off-limits, or a goal
+      order the owner cares about. Skip this question if the owner already
+      volunteered such answers.
+3. Write `factory/roadmap-answers.md` yourself: the chosen goals, then each
+   question with the owner's answer verbatim, then the extras.
+4. Draft. Find the next free milestone number (the highest `## M<N>.` in
+   `factory/milestones.md`, plus one; 1 if the file is missing). Spawn
+   `factory:roadmapper` in phase `write` with `factory/roadmap-answers.md`,
+   `factory/roadmap-candidates.md`, the number, and the `## Conventions`
+   section of `milestones.md` if it exists. Wait for `factory/roadmap-draft.md`.
+5. Show the owner the `## Goals` list and each milestone's title, step count
+   and any `[ESCALATE` steps. Ask them to approve, or to say what to change.
+   Apply edits by editing `roadmap-draft.md` yourself, or by rerunning the
+   write phase with the owner's note added to `roadmap-answers.md`. Repeat until
+   they approve or decline. Declined: stop; leave the draft in place.
+6. Approved. If `factory/milestones.md` is missing, create it with a
+   `# Milestones` heading and a `## Conventions` section of: one commit per
+   step, run `commands` after the last step, a step marked `[ESCALATE: why]`
+   stops the milestone for the owner before merge. Append the draft's
+   `## M<N>.` sections to it. Write `factory/roadmap.md`: a `# Roadmap` heading,
+   the `## Goals` list, and under each goal its milestones as `- [ ] M<N>
+   <title>`. If `roadmap.md` exists, append the new goals under a
+   `## Added <date>` heading. Tell the owner nothing is committed.
+7. Create the jobs: ask whether to run the first milestone now. If yes, run
+   `## milestone` with its number; the owner can run the rest with
+   `/factory:milestone <N> [<N> ...]`. When a milestone job reaches `merged`,
+   change its line in `roadmap.md` to `- [x]`.
+
+## overview
+
+`/factory:overview`. Run `CFG overview REPO` and print its output in a code
+block, unchanged. Then add the current board counts in one line (jobs per
+stage from `factory/board.json`, skipped if the file is missing or empty).
+Do not spawn an agent.
 
 ## next
 
@@ -395,7 +449,7 @@ say which stage it is at and stop.
   Anything an agent needs goes in a file first.
 - Each agent writes only its own file. You write `feature.md`, `rework-N.md`,
   `builder-prompt-N.md`, `board.json`, and `backlog.md`, `round-N/commands.md`, and `decision.md` for an auto-approval (including a milestone job's); `triage` writes `triage.md`; `scout` writes
-  `scout.md`; `arbiter` writes `resolution.md`.
+  `scout.md`; `roadmapper` writes `roadmap-candidates.md` and `roadmap-draft.md`, and you write `roadmap-answers.md`, `roadmap.md` and `milestones.md`; `arbiter` writes `resolution.md`.
 - Reviews start with `VERDICT: PASS` or `VERDICT: CHANGES`; `decision.md`
   starts with `APPROVE` or `ESCALATE`; `resolution.md` starts with `ACCEPT`,
   `REWORK`, or `OWNER`.
