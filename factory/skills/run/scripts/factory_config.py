@@ -36,7 +36,7 @@ SCOUT_KEYS = {"todo_paths", "docs", "checks"}
 REVIEWER_KEYS = {"name", "why", "paths", "model"}
 MODEL_ROLES = {
     "spec-writer", "builder", "reviewers", "approver", "arbiter", "scout",
-    "setup-surveyor", "foundations-scout", "tuner", "triage",
+    "setup-surveyor", "foundations-scout", "tuner", "triage", "roadmapper",
 }
 TESTS_STATES = ("none", "thin", "ok")
 NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
@@ -402,6 +402,70 @@ def migration_blockers(repo: Path, loop_file: str | None = None) -> list[str]:
     return blockers
 
 
+def overview(cfg: dict) -> str:
+    """A text diagram of the agents and steps this repo's factory runs."""
+    models = cfg.get("models") or {}
+
+    def model(role: str, fallback: str | None = None) -> str:
+        value = models.get(role) or (models.get(fallback) if fallback else None)
+        return value or "inherit"
+
+    def box(title: str, detail: str) -> list[str]:
+        return [f"  [ {title} ]  {detail}".rstrip()]
+
+    def arrow(note: str = "") -> list[str]:
+        return ["      |" + (f"  {note}" if note else ""), "      v"]
+
+    builder = cfg["builder"]
+    runtime = builder["runtime"] + (f" ({builder['resume']} resume)" if builder["runtime"] == "command" else "")
+    lanes = cfg["lanes"]
+    trivial = lanes.get("trivial")
+    skip = (trivial or {}).get("skip") or []
+    gate = cfg.get("merge_gate") or []
+    out = [f"factory overview (base: {cfg.get('base', 'main')}, tests: {cfg.get('tests')})", ""]
+    out += box("feature", "/factory:run, /factory:next, or a backlog item")
+    out += arrow()
+    if trivial:
+        out += box("triage", f"model {model('triage')}; lane trivial or full")
+        out += arrow("trivial lane skips: " + (", ".join(skip) if skip else "nothing"))
+    out += box("spec-writer", f"model {model('spec-writer')}; writes spec.md")
+    out += arrow()
+    out += box("builder", f"{runtime}; model {model('builder')}; commits on factory/<job>")
+    out += arrow()
+    commands = cfg.get("commands") or {}
+    out += box("commands", ", ".join(commands) if commands else "none")
+    out += arrow()
+    reviewers = cfg.get("reviewers") or []
+    out += box("review", f"in parallel, picked per diff; default model {model('reviewers')}")
+    for r in reviewers:
+        scope = ", ".join(r["paths"]) if r.get("paths") else "always"
+        extra = f"; model {r['model']}" if r.get("model") else ""
+        out.append(f"      |- {r['name']}: {scope}{extra}")
+    qa = cfg.get("qa")
+    if qa:
+        scope = ", ".join(qa["paths"]) if qa.get("paths") else "always"
+        out.append(f"      |- qa ({qa['agent']}): {scope}")
+    out.append(f"      '- any CHANGES -> back to builder (up to {cfg['max_rework']} rework rounds)")
+    out += arrow()
+    out += box("approval", f"model {model('approver')}; auto when reviews pass, gate green, no escalate hit")
+    if gate:
+        out.append("      merge gate: " + ", ".join(gate))
+    for e in cfg.get("escalate") or []:
+        out.append("      escalate: " + (e if isinstance(e, str) else e["when"]))
+    out.append(f"      '- ESCALATE or no convergence -> [ arbiter ] model {model('arbiter')}"
+               f"; up to {cfg['max_arbiter_rework']} rework")
+    out += arrow()
+    out += box("merge", f"--no-ff into {cfg.get('base', 'main')}; never pushes")
+    out += ["", "other commands", f"  setup     [ setup-surveyor ] model {model('setup-surveyor')}",
+            f"  scout     [ scout ] model {model('scout')}; [ foundations-scout ] model {model('foundations-scout', 'scout')}",
+            f"  milestone one builder, one review pass, no triage, spec or approver",
+            f"  roadmap   [ roadmapper ] model {model('roadmapper')}; interviews you, writes milestones.md",
+            f"  tune      [ tuner ] model {model('tuner')}"]
+    if cfg.get("related"):
+        out.append("related repos: " + ", ".join(r.get("path", str(r)) if isinstance(r, dict) else str(r) for r in cfg["related"]))
+    return "\n".join(out)
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="factory_config.py")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -416,6 +480,7 @@ def main(argv: list[str]) -> int:
         p = sub.add_parser(name)
         for arg in ("repo", "base", "head"):
             p.add_argument(arg)
+    sub.add_parser("overview").add_argument("repo")
     p = sub.add_parser("builder-done")
     for arg in ("worktree", "before_sha", "build_md", "round"):
         p.add_argument(arg)
@@ -433,6 +498,14 @@ def main(argv: list[str]) -> int:
         print("\n".join(blockers) if blockers else "ok")
         return 1 if blockers else 0
 
+    if args.cmd == "overview":
+        repo = Path(args.repo)
+        errors = validate(repo)
+        if errors:
+            print("\n".join(errors))
+            return 1
+        print(overview(load(repo)))
+        return 0
     if args.cmd == "validate":
         errors = validate(Path(args.repo))
         print("\n".join(errors) if errors else "ok")

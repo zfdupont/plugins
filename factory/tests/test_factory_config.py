@@ -185,3 +185,27 @@ def test_empty_commands_allowed_when_no_tests(tmp_path):
     text = "version: 1\nbase: main\ntests: none\ncommands: {}\nreviewers:\n  - {name: logic, why: x}\n"
     repo = make_repo(tmp_path, text, agents=["factory-review-logic"])
     assert validate(repo) == []
+
+
+def test_overview_lists_the_repos_agents(tmp_path):
+    text = MINIMAL + (
+        "qa: {agent: factory-qa}\nlanes: {trivial: {paths: ['*.md'], skip: [spec]}}\n"
+        "escalate: [deletes tests]\nmodels: {approver: opus high}\n"
+    )
+    repo = make_repo(tmp_path, text, agents=["factory-review-logic", "factory-qa"])
+    result = run_cli("overview", repo)
+    assert result.returncode == 0, result.stdout
+    for part in ("triage", "spec-writer", "builder", "logic: always", "qa (factory-qa)",
+                 "model opus high", "escalate: deletes tests", "merge gate: test", "roadmapper"):
+        assert part in result.stdout
+
+
+def test_overview_omits_triage_without_lanes(tmp_path):
+    repo = make_repo(tmp_path, MINIMAL, agents=["factory-review-logic"])
+    assert "[ triage ]" not in run_cli("overview", repo).stdout
+
+
+def test_overview_reports_invalid_config(tmp_path):
+    repo = make_repo(tmp_path, None, agents=[])
+    result = run_cli("overview", repo)
+    assert result.returncode == 1 and "not found" in result.stdout

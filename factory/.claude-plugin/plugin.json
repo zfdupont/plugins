@@ -1,6 +1,6 @@
 {
   "name": "factory",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "A spec-to-merge software factory you set up per repo: spec writer, builder, a reviewer panel chosen for the codebase, approver and arbiter, coordinated through files and a dashboard.",
   "author": {
     "name": "zfdupont"

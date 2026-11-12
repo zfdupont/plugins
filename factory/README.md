@@ -25,6 +25,8 @@ override, or run setup again to have it propose a rewrite.
 | `/factory:next` | Run the first unchecked backlog item |
 | `/factory:scout` | Find small features worth adding to the backlog |
 | `/factory:scout foundations` | Find gaps the factory needs filled: tests, lint, rules, QA, CI |
+| `/factory:roadmap` | Look ahead for long-term goals, interview you to sharpen them, and write them as milestones; offers to run the first |
+| `/factory:overview` | Print a diagram of the agents and steps this repo's factory runs |
 | `/factory:milestone <N> [<N> ...]` | Run whole milestones from the milestones file, one job each: one builder, one review pass, auto-merge unless a step is marked `[ESCALATE`, with no triage, spec or approver |
 | `/factory:approve <job-id> [<job-id> ...]` | Merge one or more jobs waiting on you, in order |
 | `/factory:rework <job-id> <note>` | Send a job back to the builder with your note |
