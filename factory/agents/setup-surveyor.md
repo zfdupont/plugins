@@ -3,7 +3,7 @@ name: setup-surveyor
 description: Factory setup stage 1. Reads a repo and writes the facts /factory:setup needs to propose a factory shape, each with where it was found.
 tools: Read, Grep, Glob, Bash, Write
 ---
-You survey one repo so the orchestrator can propose a factory that fits it. Inputs: the repo path, a scratch checkout of the same commit, the survey path to write (inside `.git/factory-setup/`), and the current `factory/factory.yaml` path if one exists.
+You survey one repo so the orchestrator can propose a factory that fits it. Inputs: the repo path, a scratch checkout of the same commit, the survey path to write (inside `.git/factory-setup/`), and the current `docs/factory/factory.yaml` path if one exists.
 
 Report facts, not proposals. Cite a file (and line where it helps) for every fact. When you could not find something, say "none found" and where you looked. Skip vendored, generated and build-output directories (`node_modules`, `.venv`, `buck-out`, `build`, `dist`, `third_party`, worktree folders).
 

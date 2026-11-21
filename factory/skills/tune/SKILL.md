@@ -13,9 +13,9 @@ its `## Setup check`. Its `CFG`, `REPO` and settings apply here.
 
 1. Create a throwaway checkout of `base` for running commands:
    `git worktree add --detach REPO/.git/factory-scratch <base>`. Spawn
-   `factory:tuner` with that checkout, the absolute path of `factory/`, and
-   the path of `factory/factory.yaml`. Use `models.tuner`. Wait for
-   `factory/tune.md`, then remove the scratch checkout
+   `factory:tuner` with that checkout, the absolute paths of `docs/factory/` and `.factory/`, and
+   the path of `docs/factory/factory.yaml`. Use `models.tuner`. Wait for
+   `.factory/tune.md`, then remove the scratch checkout
    (`git worktree remove --force REPO/.git/factory-scratch`).
 2. Show the first line of `tune.md`, then ask the owner which suggestions to
    apply: one multi-select question, one option per item, in the file's

@@ -1,10 +1,14 @@
 # factory.yaml reference
 
-`factory/factory.yaml` holds everything about a repo's factory that is not the
+`docs/factory/factory.yaml` holds everything about a repo's factory that is not the
 loop itself. `/factory:setup` writes it; the owner edits it to override; setup
 may propose a rewrite later. Reviewer and QA checklists are not here: each
 reviewer is a repo agent at `.claude/agents/factory-review-<name>.md`, and QA is
 the agent `qa.agent` names.
+
+The file lives in the tracked folder `docs/factory/`, next to `backlog.md`,
+`roadmap.md`, `milestones.md` and `specs/`. The factory's working state lives in
+`.factory/`, which ignores itself. See `SKILL.md` for what goes where.
 
 Skills never parse this file themselves. They call
 `scripts/factory_config.py` (run with `uv run --script`):
@@ -18,6 +22,8 @@ Skills never parse this file themselves. They call
 | `escalate-hit <repo> <base> <head>` | `{"hit": [{"when", "files"}], "unchecked": [...]}`: `escalate` entries whose `paths` match the diff (plus the thin-tests rule), and the plain-string entries only the approver can judge |
 | `builder-done <worktree> <before_sha> <build_md> <round>` | `done` and exit 0, or the reason and exit 1 |
 | `migration-check <repo> [--loop-file <path>]` | `ok` and exit 0, or one line per blocker (an active loop in the given state file, a dirty tree, a job in flight) and exit 1 |
+| `init <repo>` | creates what is missing of `.factory/` (`.gitignore` holding `*`, `board.json`, `jobs/`) and `docs/factory/backlog.md`, always replaces `.factory/dashboard.html`; prints `created <path>` per file, or `ok` |
+| `migrate <repo>` | moves a pre-0.4.0 `factory/` folder: `factory.yaml`, `backlog.md`, `roadmap.md` and `milestones.md` to `docs/factory/` (`git mv` when tracked), everything else the factory owns to `.factory/` (untracked with `git rm --cached`), then runs `init`. Prints one line per move and exit 0, or one `migrate: ...` line per blocker (a dirty tree outside `factory/`, a job in flight, a target that exists) and exit 1 with nothing moved. Files it does not know stay in `factory/` and are listed |
 
 ## Keys
 

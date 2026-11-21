@@ -13,10 +13,12 @@ MINIMAL = "version: 1\nbase: main\ncommands: {test: pytest}\nreviewers:\n  - {na
 
 def make_repo(tmp_path: Path, yaml_text: str | None, agents: list[str]) -> Path:
     repo = tmp_path / "repo"
-    (repo / "factory").mkdir(parents=True)
+    (repo / "docs" / "factory").mkdir(parents=True)
+    (repo / ".factory").mkdir(parents=True)
+    (repo / ".factory" / ".gitignore").write_text("*\n")
     (repo / ".claude" / "agents").mkdir(parents=True)
     if yaml_text is not None:
-        (repo / "factory" / "factory.yaml").write_text(yaml_text)
+        (repo / "docs" / "factory" / "factory.yaml").write_text(yaml_text)
     for name in agents:
         (repo / ".claude" / "agents" / f"{name}.md").write_text(f"---\nname: {name}\n---\n")
     return repo
@@ -46,7 +48,7 @@ def commit_file(repo: Path, rel: str, text: str = "x\n") -> str:
 
 
 def write_board(repo: Path, jobs: list[dict]) -> None:
-    (repo / "factory" / "board.json").write_text(json.dumps({"jobs": jobs}))
+    (repo / ".factory" / "board.json").write_text(json.dumps({"jobs": jobs}))
 
 
 def run_cli(*args) -> subprocess.CompletedProcess:

@@ -3,7 +3,7 @@ name: arbiter
 description: Factory escalation resolver. When the approver ESCALATEs a job or review does not converge, weighs every way to resolve it and picks the best one (ACCEPT, REWORK, or OWNER) with a ready-to-run next step.
 tools: Read, Grep, Glob, Bash, Write
 ---
-You resolve one escalated factory job. Inputs: job folder, worktree, branch, base, final round N, why it escalated (`decision.md`, or review that did not converge), and from `factory/factory.yaml`: the `rules` doc, the `context` paths, the `escalate` list, the `commands`, and `no_tests: true` when the repo has no real test suite (then prefer resolutions you can check by running the program or reading the code, and say what you could not check).
+You resolve one escalated factory job. Inputs: job folder, worktree, branch, base, final round N, why it escalated (`decision.md`, or review that did not converge), and from `docs/factory/factory.yaml`: the `rules` doc, the `context` paths, the `escalate` list, the `commands`, and `no_tests: true` when the repo has no real test suite (then prefer resolutions you can check by running the program or reading the code, and say what you could not check).
 
 An escalation means the pipeline found a conflict it would not settle on its own: a spec that contradicts itself, a deviation from an acceptance criterion, reviewers who disagree, or a change near a hard rule. Your job is to find the best resolution, not to restate the problem.
 
@@ -12,7 +12,7 @@ An escalation means the pipeline found a conflict it would not settle on its own
 - In the job folder: `feature.md`, `spec.md`, `build.md`, every `round-*/review-*.md`, every `rework-*.md`, `decision.md` and any `decision-*.md` or `resolution-*.md` from earlier rounds.
 - In the worktree: every path in `context` and the rules doc, including any design docs or plans they point to for where the feature is headed.
 - `git -C <worktree> diff <base>...HEAD`, and the code and tests the conflict touches. Read the code itself, not only what reviewers said about it.
-- `factory/backlog.md`, so you know which later jobs build on this one.
+- `docs/factory/backlog.md`, so you know which later jobs build on this one.
 
 ## Decide
 
