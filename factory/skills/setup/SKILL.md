@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Set up the software factory for this repo, or propose an updated setup. Reads the codebase, proposes reviewers, commands, QA, escalation rules, builder runtime and models, and writes factory/factory.yaml only after the owner approves. Use for /factory:setup.
+description: Set up the software factory for this repo, or propose an updated setup. Reads the codebase, proposes reviewers, commands, QA, escalation rules, builder runtime and models, and writes docs/factory/factory.yaml only after the owner approves. Use for /factory:setup.
 ---
 
 # Factory setup
@@ -18,6 +18,21 @@ this skill's base directory is the shape of every reviewer and QA agent.
 It is inside the git dir, so it is never committed and builds never see it.
 Never write to the working tree before the owner approves.
 
+## Layout
+
+The factory keeps two folders. `docs/factory/` is tracked: `factory.yaml`,
+`backlog.md`, `roadmap.md`, `milestones.md`, and `specs/<job-id>.md`. `.factory/`
+is working state (board, dashboard, job folders, scout and tune reports) and
+ignores itself with its own `.gitignore` holding `*`. Never edit the repo's
+`.gitignore` for it.
+
+Before anything else, run `CFG validate REPO`. If it says `found at factory/`,
+the repo uses the pre-0.4.0 layout, with everything in `factory/`. Tell the
+owner what moves where and ask to migrate now. Yes: run `CFG migrate REPO`. If
+it exits non-zero, print its lines and stop; otherwise print them, tell the
+owner the moves are staged but not committed, and go on with the survey as a
+rerun. No: stop, since no other command works on the old layout.
+
 ## Survey
 
 1. Delete any old `DRAFT` (run `git worktree remove --force DRAFT/wt` first
@@ -25,14 +40,14 @@ Never write to the working tree before the owner approves.
    running commands: `git worktree add --detach DRAFT/wt HEAD`.
 2. Spawn `factory:setup-surveyor` with REPO, the scratch checkout `DRAFT/wt`
    (where it runs every command), the survey path `DRAFT/survey.md`, and the
-   path of `factory/factory.yaml` if it exists.
+   path of `docs/factory/factory.yaml` if it exists.
    Use `models.setup-surveyor` from the current YAML if there is one. Wait for
    the survey.
 
 ## Propose
 
 Draft the whole factory from the survey into `DRAFT/proposed/`, mirroring the
-repo layout: `factory/factory.yaml`, one `.claude/agents/factory-review-<name>.md`
+repo layout: `docs/factory/factory.yaml`, one `.claude/agents/factory-review-<name>.md`
 per reviewer, and `.claude/agents/<qa agent>.md` if there is QA.
 
 `factory.yaml`, key by key (see `schema.md` for the full reference):
@@ -101,7 +116,7 @@ through it too.
    - The lineup as a table: reviewer, runs when (`always` or its `paths`),
      why. Then QA, the builder runtime, `commands` and `merge_gate`, the
      `escalate` list, `related`, and `models`.
-   - On a rerun (a `factory/factory.yaml` already exists): instead of the
+   - On a rerun (a `docs/factory/factory.yaml` already exists): instead of the
      table alone, show `diff -ru` between the current files and
      `DRAFT/proposed/`, then one reason per change. Remind the owner that
      the diff removes any hand edits it does not keep.
@@ -112,16 +127,17 @@ through it too.
    `DRAFT`, and stop. Nothing in the working tree changed.
 4. Approved: copy `DRAFT/proposed/` over the repo. On a rerun, also delete
    reviewer agent files (`factory-review-*.md`) and the QA agent that the new
-   proposal dropped. Never touch `factory/board.json` contents, `factory/jobs/`,
+   proposal dropped. Never touch `.factory/board.json` contents, `.factory/jobs/`,
    or existing `backlog.md` items.
-5. If missing, create `factory/board.json` as `{"jobs": []}`,
-   `factory/backlog.md` as `# Backlog`, and `factory/jobs/.gitkeep`. Copy
-   `<RUN>/dashboard.html` to `factory/dashboard.html` (replace it on a rerun).
+5. Run `CFG init REPO`. It creates whatever is missing of `.factory/` (its
+   `.gitignore`, `board.json`, `jobs/`) and `docs/factory/backlog.md`, and
+   always replaces `.factory/dashboard.html` with the plugin's copy.
 6. Run `CFG validate REPO`. It passed on the draft, so a failure means the
    copy went wrong: report it and stop.
 7. Remove `DRAFT/wt` if it exists (`git worktree remove --force`) and delete `DRAFT`. Tell the owner which files were written, that nothing is
-   committed, and how to watch the board:
-   `cd factory && python3 -m http.server 8765`.
+   committed (`docs/factory/` and `.claude/agents/` are meant to be;
+   `.factory/` is ignored), and how to watch the board:
+   `cd .factory && python3 -m http.server 8765`.
 8. On a first setup, run `## Foundations` next.
 
 ## Foundations
@@ -130,10 +146,10 @@ Used by `/factory:scout foundations` and at the end of a first setup.
 
 1. Create a throwaway checkout of `base` for running commands:
    `git worktree add --detach REPO/.git/factory-scratch <base>`. Spawn
-   `factory:foundations-scout` with that checkout, the absolute path of
-   `factory/`, and from the YAML `commands`, `rules`, `context`, `qa`,
+   `factory:foundations-scout` with that checkout, the absolute paths of
+   `docs/factory/` and `.factory/`, and from the YAML `commands`, `rules`, `context`, `qa`,
    `scout`, and `reviewers`. Use `models.foundations-scout`. Wait for
-   `factory/scout.md`, then remove the scratch checkout
+   `.factory/scout.md`, then remove the scratch checkout
    (`git worktree remove --force REPO/.git/factory-scratch`).
 2. Show the items as the "fix these first" list. Ask the owner which to add
    (one multi-select question, one option per item, the `Why:` line as its

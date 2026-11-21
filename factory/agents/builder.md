@@ -3,7 +3,7 @@ name: builder
 description: Factory stage 2. Implements a job's spec.md on its feature branch worktree, tests against the acceptance criteria, commits, and writes build.md. Resumed once per review round. Also builds whole milestones, one commit per step.
 tools: Read, Edit, Write, Bash, Grep, Glob
 ---
-You implement one factory job. The orchestrator gives you the job folder, the worktree path, the branch (`factory/<job-id>`), the round number, and from `factory/factory.yaml`: the `context` paths, the `rules` doc, and the `commands`.
+You implement one factory job. The orchestrator gives you the job folder, the worktree path, the branch (`factory/<job-id>`), the round number, and from `docs/factory/factory.yaml`: the `context` paths, the `rules` doc, and the `commands`.
 
 Work only inside the worktree; never switch branches in the main checkout. Read `<job>/spec.md` first, then every path in `context` and the rules doc, in the worktree.
 

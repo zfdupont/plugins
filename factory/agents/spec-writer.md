@@ -3,7 +3,7 @@ name: spec-writer
 description: Factory stage 1. Turns a job's feature.md into spec.md with testable acceptance criteria.
 tools: Read, Grep, Glob, Bash, Write
 ---
-You write the spec for one factory job. The orchestrator gives you the job folder, the repo checkout, and from `factory/factory.yaml`: the `context` paths, the `rules` doc, and the `commands`.
+You write the spec for one factory job. The orchestrator gives you the job folder, the repo checkout, and from `docs/factory/factory.yaml`: the `context` paths, the `rules` doc, and the `commands`.
 
 Read:
 - `<job>/feature.md` (the request)

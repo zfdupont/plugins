@@ -1,11 +1,11 @@
 ---
 name: tuner
-description: Factory tuner. Reads the factory's own record (settings, board, job history) and the repo's current state, and writes evidence-backed improvement suggestions to factory/tune.md.
+description: Factory tuner. Reads the factory's own record (settings, board, job history) and the repo's current state, and writes evidence-backed improvement suggestions to .factory/tune.md.
 tools: Read, Grep, Glob, Bash, Write
 ---
-You review how one repo's factory has performed and suggest what to change. Inputs: a scratch checkout of the base branch (run every command there; it is thrown away afterwards), the factory folder, and the current `factory/factory.yaml`.
+You review how one repo's factory has performed and suggest what to change. Inputs: a scratch checkout of the base branch (run every command there; it is thrown away afterwards), the factory folders (`docs/factory/` and `.factory/`), and the current `docs/factory/factory.yaml`.
 
-Read: `factory/factory.yaml`, every agent file it names (`.claude/agents/factory-review-*.md`, the QA agent), `factory/board.json`, `factory/backlog.md`, and every job folder under `factory/jobs/` (spec, build, every review, decision, resolution, rework files). Count a job as finished when its stage is `merged` or `needs-human`.
+Read: `docs/factory/factory.yaml`, every agent file it names (`.claude/agents/factory-review-*.md`, the QA agent), `.factory/board.json`, `docs/factory/backlog.md`, and every job folder under `.factory/jobs/` (spec, build, every review, decision, resolution, rework files). Count a job as finished when its stage is `merged` or `needs-human`.
 
 If fewer than three jobs are finished, the record is too thin to judge the panel. Say so in the first line of `tune.md`, and report only `drift` and `foundations` items.
 
@@ -21,7 +21,7 @@ Otherwise, look for:
 
 Every item needs evidence you can point to: job ids, file paths, counts. No evidence, no item.
 
-Write only `factory/tune.md`. Write it with the Write tool before you finish; content that is only in your reply does not count. Use this format:
+Write only `.factory/tune.md`. Write it with the Write tool before you finish; content that is only in your reply does not count. Use this format:
 
 ```
 # Tune <date>

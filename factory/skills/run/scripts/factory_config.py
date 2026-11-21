@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -40,11 +41,28 @@ MODEL_ROLES = {
 }
 TESTS_STATES = ("none", "thin", "ok")
 NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
+# Tracked factory docs (config, backlog, roadmap, milestones, merged specs) and
+# the hidden work folder (board, dashboard, jobs, scratch reports). The work
+# folder ignores itself with its own .gitignore, so the repo's .gitignore is
+# never edited. LEGACY_DIR is the pre-0.4 single folder.
+DOCS_DIR = Path("docs") / "factory"
+WORK_DIR = Path(".factory")
+LEGACY_DIR = Path("factory")
+DOCS_FILES = ("factory.yaml", "backlog.md", "roadmap.md", "milestones.md")
+WORK_FILES = (
+    "board.json", "dashboard.html", "jobs", "events.jsonl", "scout.md", "tune.md",
+    "roadmap-candidates.md", "roadmap-draft.md", "roadmap-answers.md",
+)
+DASHBOARD = Path(__file__).resolve().parent.parent / "dashboard.html"
 MODEL_RE = re.compile(r"^(opus|sonnet|haiku|fable|inherit)( (low|medium|high|xhigh|max))?$")
 
 
 def config_path(repo: Path) -> Path:
-    return Path(repo) / "factory" / "factory.yaml"
+    return Path(repo) / DOCS_DIR / "factory.yaml"
+
+
+def legacy_config(repo: Path) -> Path:
+    return Path(repo) / LEGACY_DIR / "factory.yaml"
 
 
 def read_raw(repo: Path):
@@ -86,6 +104,8 @@ def validate(repo: Path) -> list[str]:
     """Every problem with factory.yaml, one message each; [] when valid."""
     repo = Path(repo)
     if not config_path(repo).exists():
+        if legacy_config(repo).exists():
+            return ["factory.yaml: found at factory/, run /factory:setup to migrate it to docs/factory/"]
         return ["factory.yaml: not found; run /factory:setup"]
     try:
         raw = read_raw(repo)
@@ -384,22 +404,105 @@ def loop_active(path: Path) -> bool:
     return bool(isinstance(front, dict) and front.get("active"))
 
 
-def migration_blockers(repo: Path, loop_file: str | None = None) -> list[str]:
+def migration_blockers(repo: Path, loop_file: str | None = None, ignore: str | None = None) -> list[str]:
     """Why the repo's factory cannot be migrated right now; [] when it can.
 
     loop_file names a loop state file (frontmatter with `active:`) whose loop
-    must be stopped first, relative to repo."""
+    must be stopped first, relative to repo. ignore names a folder whose own
+    changes do not count as a dirty tree."""
     blockers = []
     if loop_file and loop_active(repo / loop_file):
         blockers.append(f"loop active ({loop_file})")
-    if git_out(repo, "status", "--porcelain").strip():
+    spec = ["--", ".", f":(exclude){ignore}"] if ignore else []
+    if git_out(repo, "status", "--porcelain", *spec).strip():
         blockers.append("working tree not clean")
-    board = repo / "factory" / "board.json"
+    board = repo / WORK_DIR / "board.json"
+    if not board.exists():
+        board = repo / LEGACY_DIR / "board.json"
     jobs = json.loads(board.read_text()).get("jobs", []) if board.exists() else []
     for job in jobs:
         if job.get("stage") in IN_FLIGHT:
             blockers.append(f"job {job.get('id')} in flight at stage {job['stage']}")
     return blockers
+
+
+def init_layout(repo: Path) -> list[str]:
+    """Create whatever of the factory layout is missing; return what was made.
+
+    Create-only, except dashboard.html, which is always replaced so a plugin
+    update reaches it. `.factory/.gitignore` is never overwritten: a repo may
+    commit its own to track some work files."""
+    repo = Path(repo)
+    made = []
+    work, docs = repo / WORK_DIR, repo / DOCS_DIR
+
+    def create(path: Path, text: str) -> None:
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+            made.append(str(path.relative_to(repo)))
+
+    create(work / ".gitignore", "*\n")
+    create(work / "board.json", '{"jobs": []}\n')
+    if not (work / "jobs").is_dir():
+        (work / "jobs").mkdir(parents=True)
+        made.append(str((WORK_DIR / "jobs").as_posix()) + "/")
+    create(docs / "backlog.md", "# Backlog\n")
+    if DASHBOARD.exists():
+        shutil.copyfile(DASHBOARD, work / "dashboard.html")
+    return made
+
+
+def tracked(repo: Path, rel: Path) -> bool:
+    out = subprocess.run(
+        ["git", "-C", str(repo), "ls-files", "--", str(rel)], capture_output=True, text=True
+    )
+    return bool(out.stdout.strip())
+
+
+def migrate(repo: Path) -> tuple[list[str], list[str]]:
+    """Move a pre-0.4 `factory/` folder to `docs/factory/` and `.factory/`.
+
+    Returns (done, problems). Nothing moves when there is a problem."""
+    repo = Path(repo)
+    legacy = repo / LEGACY_DIR
+    if not legacy_config(repo).exists():
+        return [], ["migrate: no factory/factory.yaml to migrate"]
+    if config_path(repo).exists():
+        return [], ["migrate: docs/factory/factory.yaml already exists"]
+    problems = [f"migrate: {b}" for b in migration_blockers(repo, ignore=str(LEGACY_DIR))]
+    problems += [
+        f"migrate: {dest / name} already exists"
+        for names, dest in ((DOCS_FILES, DOCS_DIR), (WORK_FILES, WORK_DIR))
+        for name in names
+        if (legacy / name).exists() and (repo / dest / name).exists()
+    ]
+    if problems:
+        return [], problems
+    done = []
+    for names, dest in ((DOCS_FILES, DOCS_DIR), (WORK_FILES, WORK_DIR)):
+        for name in names:
+            src, rel = legacy / name, LEGACY_DIR / name
+            if not src.exists():
+                continue
+            (repo / dest).mkdir(parents=True, exist_ok=True)
+            if dest == DOCS_DIR and tracked(repo, rel):
+                git_out(repo, "mv", str(rel), str(dest / name))
+            else:
+                if tracked(repo, rel):
+                    git_out(repo, "rm", "-r", "-q", "--cached", str(rel))
+                shutil.move(str(src), str(repo / dest / name))
+            done.append(f"{rel} -> {dest / name}")
+    for path in (legacy / "jobs" / ".gitkeep", repo / WORK_DIR / "jobs" / ".gitkeep"):
+        if path.exists():
+            path.unlink()
+    left = sorted(p.name for p in legacy.iterdir()) if legacy.is_dir() else []
+    if legacy.is_dir() and not left:
+        legacy.rmdir()
+    elif left:
+        done.append(f"left in factory/: {', '.join(left)}")
+    done += [f"created {m}" for m in init_layout(repo)]
+    return done, []
 
 
 def overview(cfg: dict) -> str:
@@ -487,7 +590,18 @@ def main(argv: list[str]) -> int:
     p = sub.add_parser("migration-check")
     p.add_argument("repo")
     p.add_argument("--loop-file")
+    sub.add_parser("init").add_argument("repo")
+    sub.add_parser("migrate").add_argument("repo")
     args = parser.parse_args(argv)
+
+    if args.cmd == "init":
+        made = init_layout(Path(args.repo))
+        print("\n".join(f"created {m}" for m in made) if made else "ok")
+        return 0
+    if args.cmd == "migrate":
+        done, problems = migrate(Path(args.repo))
+        print("\n".join(problems or done))
+        return 1 if problems else 0
 
     if args.cmd == "builder-done":
         reason = builder_done(Path(args.worktree), args.before_sha, Path(args.build_md), args.round)

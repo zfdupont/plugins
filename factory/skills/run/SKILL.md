@@ -6,7 +6,7 @@ description: Run the software factory on one feature, from spec to merge. Use fo
 # Factory
 
 You are the orchestrator. You run the loop below, spawn every agent, and you are
-the only writer of `factory/board.json`. Agents get their context from files and
+the only writer of `.factory/board.json`. Agents get their context from files and
 from the values you pass, not from this conversation, and each writes only its
 own file.
 
@@ -14,12 +14,22 @@ own file.
 `CFG` means `uv run -q --script <this skill's base directory>/scripts/factory_config.py`.
 `schema.md` in this skill's base directory is the `factory.yaml` reference.
 
+The factory keeps two folders in REPO. `docs/factory/` is tracked and holds
+`factory.yaml`, `backlog.md`, `roadmap.md`, `milestones.md` and
+`specs/<job-id>.md`. `.factory/` is working state that ignores itself, and holds
+everything else: `board.json`, `dashboard.html`, `jobs/`, `scout.md`, `tune.md`
+and the roadmap drafts. A bare `backlog.md`, `roadmap.md` or `milestones.md`
+below means the one in `docs/factory/`; a bare `jobs/<id>/` means
+`.factory/jobs/<id>/`.
+
 ## Setup check
 
 Run this before every command except `/factory:setup`.
 
 1. Run `CFG validate REPO`. If it exits non-zero, print its lines and stop. If
-   the only line says `not found`, tell the user to run `/factory:setup`.
+   the only line says `not found`, tell the user to run `/factory:setup`. If it
+   says `found at factory/`, tell the user to run `/factory:setup`, which
+   migrates the old layout.
 2. Read the settings with `CFG get REPO <key>` and keep them for this run:
    `base`, `max_rework`, `max_arbiter_rework`, `worktrees`, `context`, `rules`,
    `tests`, `commands`, `merge_gate`, `scout`, `builder`, `reviewers`, `qa`,
@@ -78,7 +88,7 @@ feature
 
 ## Board
 
-`factory/board.json` drives `factory/dashboard.html`. Rewrite the whole file
+`.factory/board.json` drives `.factory/dashboard.html`. Rewrite the whole file
 after every state change (read it, change the one job, write it back).
 
 ```json
@@ -111,7 +121,7 @@ before you start the next round.
 ## Job files
 
 ```
-factory/jobs/<job-id>/
+.factory/jobs/<job-id>/
   feature.md            the request (you write it)
   triage.md             triage (only when the repo has `lanes`)
   spec.md               spec-writer (or a copy of feature.md for a trivial job)
@@ -125,7 +135,7 @@ factory/jobs/<job-id>/
   resolution.md         arbiter (after an escalation)
 ```
 
-Job ids are `NNN-slug`: the next free 3-digit number in `factory/jobs/`, plus a
+Job ids are `NNN-slug`: the next free 3-digit number in `.factory/jobs/`, plus a
 short kebab-case slug of the feature.
 
 ## /factory:run
@@ -270,30 +280,37 @@ final round number, the reviewers that ran in it, `rules`, `context`,
 
 1. Find where `base` is checked out with `git worktree list`. If nowhere, run
    `git worktree add <worktrees>/_base <base>`.
-2. If that checkout has uncommitted changes (`git status --porcelain` prints
-   anything), set stage `needs-human` with note "base checkout has uncommitted
-   changes" and stop; never stash or discard them. Otherwise, in that checkout:
-   `git merge --no-ff factory/<id> -m "Merge factory/<id>"`.
+2. Keep the spec. In the job worktree, copy `jobs/<id>/spec.md` to
+   `docs/factory/specs/<id>.md` (create the folder if needed) and commit it on
+   the job branch: `git -C <worktree> add docs/factory/specs/<id>.md && git -C
+   <worktree> commit -m "factory: spec for <id>"`. Skip this if that file
+   already exists on the branch with the same content (a retried merge).
+3. If the base checkout has uncommitted changes outside `docs/factory/`
+   (`git status --porcelain -- . ':(exclude)docs/factory'` prints anything), set
+   stage `needs-human` with note "base checkout has uncommitted changes" and
+   stop; never stash or discard them. Your own uncommitted edits to
+   `backlog.md`, `roadmap.md` and `milestones.md` do not count. Otherwise, in
+   that checkout: `git merge --no-ff factory/<id> -m "Merge factory/<id>"`.
    If the merge conflicts, run `git merge --abort`, set stage `needs-human` with
    note "merge conflict", and stop.
-3. Run each `merge_gate` command there. If one fails, report it, set stage
+4. Run each `merge_gate` command there. If one fails, report it, set stage
    `needs-human` with note "merge gate failed: <command>", and stop; do not
    revert on your own.
-4. Remove the job worktree (`git worktree remove <worktrees>/<id>`). Keep the
+5. Remove the job worktree (`git worktree remove <worktrees>/<id>`). Keep the
    branch. Never push.
-5. Add follow-ups to the backlog. Read the final round's reviews, `decision.md`,
+6. Add follow-ups to the backlog. Read the final round's reviews, `decision.md`,
    and the builder's notes in `build.md`. Collect every non-blocking finding,
    nit, flaky test, and item the spec defers to later work, unless a backlog
    item already covers it. Append each one to `backlog.md` as `- [ ] <item>`
    under a `## Follow-ups from job <id>` heading at the end of the file. Write
    each item as a concrete feature that names the file or command. Tell the
    user how many you added.
-6. Set stage `merged`. Merge is the only place that sets it.
+7. Set stage `merged`. Merge is the only place that sets it.
 
 ## milestone
 
 `/factory:milestone <N> [<N> ...]`. One milestone is one job. Use it when
-`factory/milestones.md` (or the file the repo's docs name) holds a `## M<N>.`
+`docs/factory/milestones.md` (or the file the repo's docs name) holds a `## M<N>.`
 section with a `**Steps:**` list. It skips triage, the spec-writer and the
 approver, uses one builder for every step and one review pass for the whole
 diff, and auto-merges unless the milestone text explicitly flags a step.
@@ -344,8 +361,8 @@ only reads and writes files.
 1. Survey. Create a throwaway checkout of `base`
    (`git worktree add --detach REPO/.git/factory-scratch <base>`) and spawn
    `factory:roadmapper` in phase `survey` with that checkout, the absolute
-   path of `factory/`, `context`, `rules`, `commands`, `scout`, `escalate`.
-   Wait for `factory/roadmap-candidates.md`, then remove the scratch checkout.
+   paths of `docs/factory/` and `.factory/`, `context`, `rules`, `commands`, `scout`, `escalate`.
+   Wait for `.factory/roadmap-candidates.md`, then remove the scratch checkout.
    If it holds "No long-term goals found.", say so and stop.
 2. Interview, in three steps. Never answer for the owner.
    a. Ask which goals to pursue: one multi-select question, one option per
@@ -357,23 +374,23 @@ only reads and writes files.
    c. Ask once, free-form: constraints, deadlines, things off-limits, or a goal
       order the owner cares about. Skip this question if the owner already
       volunteered such answers.
-3. Write `factory/roadmap-answers.md` yourself: the chosen goals, then each
+3. Write `.factory/roadmap-answers.md` yourself: the chosen goals, then each
    question with the owner's answer verbatim, then the extras.
 4. Draft. Find the next free milestone number (the highest `## M<N>.` in
-   `factory/milestones.md`, plus one; 1 if the file is missing). Spawn
-   `factory:roadmapper` in phase `write` with `factory/roadmap-answers.md`,
-   `factory/roadmap-candidates.md`, the number, and the `## Conventions`
-   section of `milestones.md` if it exists. Wait for `factory/roadmap-draft.md`.
+   `docs/factory/milestones.md`, plus one; 1 if the file is missing). Spawn
+   `factory:roadmapper` in phase `write` with `.factory/roadmap-answers.md`,
+   `.factory/roadmap-candidates.md`, the number, and the `## Conventions`
+   section of `milestones.md` if it exists. Wait for `.factory/roadmap-draft.md`.
 5. Show the owner the `## Goals` list and each milestone's title, step count
    and any `[ESCALATE` steps. Ask them to approve, or to say what to change.
    Apply edits by editing `roadmap-draft.md` yourself, or by rerunning the
    write phase with the owner's note added to `roadmap-answers.md`. Repeat until
    they approve or decline. Declined: stop; leave the draft in place.
-6. Approved. If `factory/milestones.md` is missing, create it with a
+6. Approved. If `docs/factory/milestones.md` is missing, create it with a
    `# Milestones` heading and a `## Conventions` section of: one commit per
    step, run `commands` after the last step, a step marked `[ESCALATE: why]`
    stops the milestone for the owner before merge. Append the draft's
-   `## M<N>.` sections to it. Write `factory/roadmap.md`: a `# Roadmap` heading,
+   `## M<N>.` sections to it. Write `docs/factory/roadmap.md`: a `# Roadmap` heading,
    the `## Goals` list, and under each goal its milestones as `- [ ] M<N>
    <title>`. If `roadmap.md` exists, append the new goals under a
    `## Added <date>` heading. Tell the owner nothing is committed.
@@ -386,12 +403,12 @@ only reads and writes files.
 
 `/factory:overview`. Run `CFG overview REPO` and print its output in a code
 block, unchanged. Then add the current board counts in one line (jobs per
-stage from `factory/board.json`, skipped if the file is missing or empty).
+stage from `.factory/board.json`, skipped if the file is missing or empty).
 Do not spawn an agent.
 
 ## next
 
-Read `factory/backlog.md`. Take the first `- [ ]` item (items under
+Read `docs/factory/backlog.md`. Take the first `- [ ]` item (items under
 `## Foundations` come first because that section is at the top). Change it to
 `- [x]` with ` (job <id>)` appended, then run `## /factory:run` with that item.
 If there is none, say so and suggest `/factory:scout` and
@@ -400,8 +417,8 @@ If there is none, say so and suggest `/factory:scout` and
 ## scout
 
 1. Spawn `factory:scout` with the checkout of `base` (from `git worktree
-   list`), the absolute path of `factory/`, `scout`, `escalate`, `context`.
-   Wait for `factory/scout.md`.
+   list`), the absolute paths of `docs/factory/` and `.factory/`, `scout`, `escalate`, `context`.
+   Wait for `.factory/scout.md`.
 2. Ask the user which items to add (one multi-select question, one option per
    item, the `Why:` line as its description).
 3. Append the chosen items to `backlog.md` as `- [ ] <item>`. Leave the rest in
@@ -417,7 +434,7 @@ at `needs-human`. For each job, show the user `resolution.md` if it exists, else
 flagged steps and the review verdict), in two or three lines per job; if no
 review round finished (for example, the builder run failed), say so. Then Merge
 that job; the merge gate runs after each one. The user typing the command is the
-approval; do not ask again. In Merge step 5, also add the `- [ ]` follow-ups from
+approval; do not ask again. In Merge step 6, also add the `- [ ]` follow-ups from
 an `ACCEPT` resolution's `## Next step`. Its spec amendment stays on record in
 `resolution.md`; nobody rewrites `spec.md`.
 
@@ -448,7 +465,7 @@ say which stage it is at and stop.
 - Prompts to agents contain paths and values, never conversation content.
   Anything an agent needs goes in a file first.
 - Each agent writes only its own file. You write `feature.md`, `rework-N.md`,
-  `builder-prompt-N.md`, `board.json`, and `backlog.md`, `round-N/commands.md`, and `decision.md` for an auto-approval (including a milestone job's); `triage` writes `triage.md`; `scout` writes
+  `builder-prompt-N.md`, `board.json`, `docs/factory/specs/<id>.md`, and `backlog.md`, `round-N/commands.md`, and `decision.md` for an auto-approval (including a milestone job's); `triage` writes `triage.md`; `scout` writes
   `scout.md`; `roadmapper` writes `roadmap-candidates.md` and `roadmap-draft.md`, and you write `roadmap-answers.md`, `roadmap.md` and `milestones.md`; `arbiter` writes `resolution.md`.
 - Reviews start with `VERDICT: PASS` or `VERDICT: CHANGES`; `decision.md`
   starts with `APPROVE` or `ESCALATE`; `resolution.md` starts with `ACCEPT`,
@@ -462,5 +479,5 @@ say which stage it is at and stop.
   escalated.
 - Never push.
 - Tell the user one line per stage change. Point them at the dashboard:
-  `cd factory && python3 -m http.server 8765`, then
+  `cd .factory && python3 -m http.server 8765`, then
   http://localhost:8765/dashboard.html
