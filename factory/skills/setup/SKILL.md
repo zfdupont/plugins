@@ -78,7 +78,9 @@ per reviewer, and `.claude/agents/<qa agent>.md` if there is QA.
 - `related`: every related repo with its contract.
 - `models`: `spec-writer`, `approver` and `arbiter` on the most capable model,
   `reviewers` and `scout` on a mid-tier model, unless the repo or the owner's
-  rules say otherwise.
+  rules say otherwise. When the owner wants Claude kept for the final
+  judgment, keep `approver` and `arbiter` on Claude and propose `codex:<id>`
+  values (see `models` in `<RUN>/schema.md`) for the other roles.
 
 Choosing the reviewer lineup:
 

@@ -29,6 +29,10 @@ You only override what you care about. A role with no line in the rule keeps the
 
 You might be wondering what happens if you use Auto. Set a role to `inherit-parent` or `auto` and pstack omits the subagent `model` field, so the subagent inherits your parent chat model. Both values mean the same thing, and neither is a model slug. For a panel role the value is a list, and one subagent runs per entry, so the list length sets the panel size. Setup also configures `swarm workers`, the default model for every `/swarm` worker unless a race names a model for each arm.
 
+## Run roles on Codex
+
+In T3 Code with a Codex provider enabled, `/setup-pstack` also lists Codex models, written as `codex:<model> <effort>`, and asks for a provider split. `claude-first` keeps the skill defaults. `codex-first` moves code delegates, explorers, investigators, explainers and the review panels to Codex, and keeps Claude for the parent chat, `hardest tasks`, and the final-word roles (`why synthesizer` and the `reflect` judgment line). A `codex:` seat runs as a T3 `delegate_task` child, per [`codex-delegates.md`](../../skills/poteto-mode/references/codex-delegates.md). Outside T3 Code, or when Codex can't run a child, each `codex:` seat falls back to that role's Claude default and says so.
+
 ## Accept the verification offers, or don't
 
 At the end of setup, `/setup-pstack` looks for a way to prove app behavior in your project, either a `verify-*` skill or an existing harness. If it finds neither, it offers once to generate one with [`/create-verification-skill`](../../skills/create-verification-skill/SKILL.md).

@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 In Codex (you have `spawn_agent`, not `Agent`), first read `../poteto-mode/references/runtimes.md`, resolved against this skill's base directory. It maps this skill's Claude Code tools, model names and paths.
 
+A role value that starts with `codex:` runs on Codex. In Claude Code, spawn that seat per `../poteto-mode/references/codex-delegates.md`, resolved against this skill's base directory.
+
 Adversaries try to break a change or a design. A finding survives only when a run proves it. Report the findings. Do not apply fixes.
 
 ## Frame

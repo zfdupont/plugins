@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 In Codex (you have `spawn_agent`, not `Agent`), first read `../poteto-mode/references/runtimes.md`, resolved against this skill's base directory. It maps this skill's Claude Code tools, model names and paths.
 
+A role value that starts with `codex:` runs on Codex. In Claude Code, spawn that seat per `../poteto-mode/references/codex-delegates.md`, resolved against this skill's base directory.
+
 Open a todolist with one entry per phase (Frame, Fan out, Cross-judge, Pick, Graft, Verify) before launching anything.
 
 ## Phase A: Frame
@@ -16,7 +18,7 @@ Every candidate gets the same prompt, so the prompt is the contract.
 
 1. State the artifact each candidate is producing.
 2. Derive the rubric, 3-6 concrete gradeable criteria for what success looks like on *this* task. It is the picker's tool in Phase D. Candidates only see the task.
-3. Pick the runners. Use the `arena runners` line in `~/.claude/rules/pstack-models.md`. If the rule or that line is missing, default to one each on `opus xhigh` and `sonnet xhigh`. An `auto` or `inherit-parent` entry in this line means the parent model, so omit `model` for it. If the Agent tool rejects a configured entry, run that seat on its family's default and say so. A family is the model name: `opus`, `sonnet`, `haiku`, or `fable`. If the family has no default, or the Agent tool rejects that default, use the closest valid model of the same model from its error message, or drop the seat and say so when there is none. If dropped seats leave fewer than two runners, add runners until there are two, or one when the line has one entry. Run each added runner on a remaining runner's model, or omit `model` so it runs on the parent model when none remain, and say so. Spawn more runners when the arena covers multiple design directions. Use the same model N times when the work is generation-bound rather than judgment-sensitive. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.
+3. Pick the runners. Use the `arena runners` line in `~/.claude/rules/pstack-models.md`. If the rule or that line is missing, default to one each on `opus xhigh` and `sonnet xhigh`. An `auto` or `inherit-parent` entry in this line means the parent model, so omit `model` for it. If the Agent tool rejects a configured entry, run that seat on its family's default and say so. A family is the model name: `opus`, `sonnet`, `haiku`, or `fable`, or the model id of a `codex:` entry. If the family has no default, or the Agent tool rejects that default, use the closest valid model of the same model from its error message, or drop the seat and say so when there is none. If dropped seats leave fewer than two runners, add runners until there are two, or one when the line has one entry. Run each added runner on a remaining runner's model, or omit `model` so it runs on the parent model when none remain, and say so. Spawn more runners when the arena covers multiple design directions. Use the same model N times when the work is generation-bound rather than judgment-sensitive. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.
 4. Give each candidate its own output location (a git worktree where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`), per the **separate-before-serializing-shared-state** principle skill.
 
 ## Phase B: Fan out
