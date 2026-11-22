@@ -8,6 +8,8 @@ color: yellow
 
 # Poteto mode
 
+In Codex (you have `spawn_agent`, not `Agent`), first read `references/runtimes.md` in this skill's base directory. It maps the Claude Code tools, model names and paths this skill and its playbooks name.
+
 Bundled skills live at `../<name>/SKILL.md` from this file, so put this file's absolute path in every `poteto-agent` prompt. To run another pstack skill ("the **name** skill" or `/name`), `Read` `../<name>/SKILL.md` and follow it, because the `Skill` tool refuses pstack skills marked `disable-model-invocation`. When you tell the user to type one, write `/pstack:<name>`.
 
 ## Non-negotiables

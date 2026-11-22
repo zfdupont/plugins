@@ -25,6 +25,10 @@ claude code leaves auto-update off for third-party marketplaces. to turn it on, 
 
 claude code prefixes plugin commands and agents, so `/poteto-mode` is `/pstack:poteto-mode` and the subagent is `pstack:poteto-agent`. `/pstack:setup-pstack` writes your model choices to `~/.claude/rules/pstack-models.md`, which claude code loads into every session.
 
+### codex
+
+codex reads the same manifests: `codex plugin marketplace add zfdupont/plugins`, then `codex plugin add pstack@zfdupont-plugins`, and mention a skill with `$`, such as `$pstack:poteto-mode`. the skills stay written for claude code. each one that names a claude code tool, model or path tells codex to read [`poteto-mode/references/runtimes.md`](./skills/poteto-mode/references/runtimes.md) first, which maps `Agent` to `spawn_agent`, `isolation: "worktree"` to worktrees you make yourself, claude models to codex models by tier, and `~/.claude/` paths to their codex places. in codex, `$pstack:setup-pstack` writes `~/.codex/pstack-models.md`. to register `poteto-agent` and `comment-sicko` as codex agents, run `uv run scripts/codex_agents.py plugins` from the repo root. without that, codex spawns a plain subagent with the agent file as its prompt.
+
 ## get started
 
 two steps:

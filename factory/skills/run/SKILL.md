@@ -47,8 +47,11 @@ so the repo's own commands never see them.
   `factory-review-<r>`; QA is the repo agent named by `qa.agent`.
 - Model and effort: look up the role in `models` (`triage`, `spec-writer`,
   `builder`, `approver`, `arbiter`, `scout`, `roadmapper`; every reviewer and QA use `reviewers`, unless
-  the reviewer entry has its own `model`). A value `<model> <effort>` maps to
-  the Agent tool's `model` and `effort`. `inherit`, or no entry, omits them.
+  the reviewer entry has its own `model`). A value `<model> <effort>` sets the
+  spawn's model and effort as `## Runtimes` says. `inherit`, or no entry, omits
+  them.
+- Spawning, follow-up messages, waiting and asking the owner work as
+  `## Runtimes` says for the host you run in.
 - Every prompt carries absolute paths and these values, never conversation
   content: job folder, worktree, branch (`factory/<job-id>`), `base`, round N,
   the `context` paths, the `rules` doc, and `commands`.
@@ -62,6 +65,44 @@ so the repo's own commands never see them.
     and only the tests you cite. A failing command in it is a CHANGES item."
   - Every reviewer whose name starts with `contract` also gets every `related`
     entry (path and contract).
+
+## Runtimes
+
+The same loop runs in Claude Code and in Codex. Only these mechanics differ.
+If you have the Agent tool, you are in Claude Code; if you have `spawn_agent`,
+you are in Codex.
+
+Claude Code:
+- Spawn: the Agent tool. Plugin agent `<role>` is `subagent_type`
+  `factory:<role>`; a repo agent (reviewer, QA) is its own name. `model` and
+  `effort` come from the `models` value.
+- Follow-up to a running or finished agent: SendMessage to its id or name.
+- Ask the owner: AskUserQuestion (a multi-select question is `multiSelect`).
+
+Codex:
+- Spawn: `spawn_agent` with `fork_turns: "none"`, so the agent gets only your
+  message, never this conversation, and `task_name` set to the name this skill
+  gives the agent (for example `builder-<id>`), else `<role>-<id>`.
+  - Role: if `spawn_agent` lists the role `factory-<role>` (plugin agent) or
+    the repo agent's own name (reviewer, QA), pass it as `agent_type`.
+    Otherwise omit `agent_type` and start `message` with the full text of the
+    agent's file without its frontmatter, then a line `---`, then the prompt.
+    Plugin agent `<role>` is `../../agents/<role>.md`, resolved against this
+    skill's base directory; a repo agent is `REPO/.claude/agents/<name>.md`.
+  - Model: `opus`, `sonnet`, `haiku` and `fable` are Claude models; never pass
+    them. Omit `model` so the agent inherits yours. Pass the effort, if any, as
+    `reasoning_effort`.
+  - Parallel: spawn every agent of a review round before you wait on any.
+- Follow-up: `followup_task` with `target` = the agent's `task_name`.
+- Wait: `wait_agent` until every agent you wait on has finished, then check
+  for its file as the stage says.
+- Ask the owner: `request_user_input` works only in Plan mode. Otherwise ask in
+  plain text: number the options, put your recommendation first, say how to
+  pick several for a multi-select question, and end your turn. Go on from the
+  same step when the owner answers.
+
+Both: the `builder` field on the board holds the name you send follow-ups to.
+`builder.runtime: claude` means "a subagent of this session" in either host.
 
 ## The loop
 
@@ -97,7 +138,7 @@ after every state change (read it, change the one job, write it back).
   "title": "status --json",
   "branch": "factory/004-status-json",
   "worktree": "<worktrees>/004-status-json",
-  "builder": "<agent id or name used for SendMessage, or the runner session id>",
+  "builder": "<agent id or name used for follow-ups, or the runner session id>",
   "lane": "full",
   "stage": "review",
   "round": 2,
@@ -167,12 +208,12 @@ the builder has finished, run
 non-zero, set stage `needs-human` with note "builder run failed: <its output>"
 and stop.
 
-`runtime: claude`:
+`runtime: claude` (a subagent of this session; see `## Runtimes`):
 - Round 1, or no reachable builder: spawn `factory:builder` named
   `builder-<id>` and record its id in `builder`. Prompt: job folder, worktree,
   branch, round N, `context`, `rules`, `commands`. On a fresh spawn after round
   1, tell it to read `build.md` and the round's review or rework files first.
-- Later rounds: resume the same builder with SendMessage: "Round N. Read
+- Later rounds: resume the same builder with a follow-up message: "Round N. Read
   `jobs/<id>/round-<N-1>/` (and `jobs/<id>/rework-<N>.md` if it exists) and fix
   every CHANGES item. Append `## Round N` to build.md."
 - Wait for it to finish, then run the `builder-done` check above. Do not wait
@@ -180,7 +221,7 @@ and stop.
   failed the round.
 
 `runtime: command`:
-1. Write `jobs/<id>/builder-prompt-N.md` with what a Claude builder would get:
+1. Write `jobs/<id>/builder-prompt-N.md` with what a subagent builder would get:
    - the prompt values above;
    - for round 1, "implement spec.md";
    - for later rounds, the review and rework files to fix;
@@ -216,7 +257,8 @@ and stop.
    If `run` is empty, set stage `needs-human` with note "no reviewer matched
    this diff" and stop. Otherwise set stage `review` and replace `reviews` with
    every `run` name as `pending` and every `skipped` name as `skipped`.
-2. Spawn every `run` name in ONE message so they run in parallel. Reviewer
+2. Spawn every `run` name at once so they run in parallel (in Claude Code, in
+   ONE message). Reviewer
    `<r>` writes `round-N/review-<r>.md`; QA writes `round-N/review-qa.md`. Each
    prompt gives job folder, worktree, branch, `base`, round N, its output file,
    `context`, `rules`, `commands` (plus `related` for `contract*` reviewers).
@@ -470,7 +512,7 @@ say which stage it is at and stop.
 - Reviews start with `VERDICT: PASS` or `VERDICT: CHANGES`; `decision.md`
   starts with `APPROVE` or `ESCALATE`; `resolution.md` starts with `ACCEPT`,
   `REWORK`, or `OWNER`.
-- An agent that finishes without writing its file gets one SendMessage
+- An agent that finishes without writing its file gets one follow-up message
   asking it to write that file now, word for word what it reported. If the file
   is still missing, treat it as the stage says for a missing file (a review
   counts as `CHANGES`; `decision.md` counts as `ESCALATE`; the others set

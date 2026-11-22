@@ -6,6 +6,8 @@ disable-model-invocation: true
 
 # How
 
+In Codex (you have `spawn_agent`, not `Agent`), first read `../poteto-mode/references/runtimes.md`, resolved against this skill's base directory. It maps this skill's Claude Code tools, model names and paths.
+
 Explore the codebase to answer "how does X work?" questions. Produce architectural explanations at the level of a senior engineer onboarding onto a subsystem, enough to build a working mental model, not so much that it reads like annotated source code.
 
 Every spawn is an Agent subagent with `subagent_type: "Explore"`. Explore agents keep `Bash`, so every brief also says "do not edit files", and you check `git status` afterward. Explorers use the `how explorer` line in the `~/.claude/rules/pstack-models.md` rule (default `sonnet xhigh`), and every explainer uses the `how explainer` line (default `opus xhigh`). Set `model` to that line's value, or to the default if the rule or the line is missing. Leave `model` unset when the value is `auto` or `inherit-parent`. If the Agent tool rejects a model, use the default and say so. If it rejects the default, use the closest valid model of the same model from its error message. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.

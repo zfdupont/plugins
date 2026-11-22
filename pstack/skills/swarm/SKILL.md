@@ -6,6 +6,8 @@ disable-model-invocation: true
 
 # Swarm
 
+In Codex (you have `spawn_agent`, not `Agent`), first read `../poteto-mode/references/runtimes.md`, resolved against this skill's base directory. It maps this skill's Claude Code tools, model names and paths.
+
 ## Start
 
 Open a todolist with one entry per phase before launching anything.

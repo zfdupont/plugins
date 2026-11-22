@@ -6,6 +6,8 @@ disable-model-invocation: true
 
 # Recall
 
+In Codex (you have `spawn_agent`, not `Agent`), first read `../poteto-mode/references/runtimes.md`, resolved against this skill's base directory. It maps this skill's Claude Code tools, model names and paths.
+
 **Before you start or resume work, you rebuild the user's recent working context and hand back a tight capsule of where things stand now and what to do next.**
 
 Keep it tight and on-topic. Read only what the in-scope threads need, then stop.

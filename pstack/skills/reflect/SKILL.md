@@ -6,6 +6,8 @@ disable-model-invocation: true
 
 # Reflect
 
+In Codex (you have `spawn_agent`, not `Agent`), first read `../poteto-mode/references/runtimes.md`, resolved against this skill's base directory. It maps this skill's Claude Code tools, model names and paths.
+
 Mine the current conversation for durable learnings, then route them into skill edits.
 
 Invoke when the user says "reflect" or "/reflect". Skip when the conversation is trivial, off-topic, or already covered by an existing skill the parent followed correctly. One-offs are not learnings.

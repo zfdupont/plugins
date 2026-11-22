@@ -13,6 +13,8 @@ this skill's base directory. `CFG` means
 `uv run -q --script <RUN>/scripts/factory_config.py`. `<RUN>/schema.md` is the
 `factory.yaml` reference; read it before drafting. `reviewer-template.md` in
 this skill's base directory is the shape of every reviewer and QA agent.
+Spawn agents and ask the owner as `## Runtimes` in `<RUN>/SKILL.md` says for
+the host you run in (Claude Code or Codex).
 
 `DRAFT` is `REPO/.git/factory-setup/`. Everything before approval goes there.
 It is inside the git dir, so it is never committed and builds never see it.

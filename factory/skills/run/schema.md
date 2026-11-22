@@ -48,12 +48,13 @@ Any key not in this table is an error.
 | `escalate` | list of strings or `{when, paths}` | `[]` | the approver escalates on any of these, even when reviews pass. A string is prose only the approver can judge. An object adds `paths` (globs, same rules as Reviewers): when the diff matches none of them and the other auto-approve conditions hold, the orchestrator approves without the approver. See Escalate |
 | `lanes` | map | `{}` | optional fast lanes. Only `trivial` exists. See Lanes |
 | `related` | list of `{path, contract}` | `[]` | sibling repos; reviewers named `contract*` get them in their prompt |
-| `models` | map role to `<model> [effort]` | `{}` | roles: `spec-writer`, `builder`, `reviewers`, `approver`, `arbiter`, `scout`, `setup-surveyor`, `foundations-scout`, `tuner`, `triage`, `roadmapper`; model is `opus`, `sonnet`, `haiku`, `fable` or `inherit`; effort is `low`, `medium`, `high`, `xhigh` or `max` |
+| `models` | map role to `<model> [effort]` | `{}` | roles: `spec-writer`, `builder`, `reviewers`, `approver`, `arbiter`, `scout`, `setup-surveyor`, `foundations-scout`, `tuner`, `triage`, `roadmapper`; model is `opus`, `sonnet`, `haiku`, `fable` or `inherit`; effort is `low`, `medium`, `high`, `xhigh` or `max`. In Codex the model is ignored (the agent inherits the session's model) and only the effort applies |
 
 ## Builder
 
-- `runtime: claude` spawns `factory:builder` and resumes it with SendMessage
-  each round.
+- `runtime: claude` spawns `factory:builder` as a subagent of the session
+  (Claude Code or Codex, see `## Runtimes` in SKILL.md) and resumes it with a
+  follow-up message each round. The name is historical.
 - `runtime: command` runs `builder.command` with Bash in the job worktree. It
   must contain `{prompt_file}`; it may also use `{session}` and `{out_prefix}`.
   - `{prompt_file}` is `jobs/<id>/builder-prompt-<N>.md` (absolute path).

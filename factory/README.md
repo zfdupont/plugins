@@ -1,6 +1,6 @@
 # factory
 
-A software factory for Claude Code. A feature goes from spec to merge through a
+A software factory for Claude Code and Codex. A feature goes from spec to merge through a
 spec writer, a builder, a panel of reviewers chosen for the repo, an approver,
 and an arbiter. Agents hand work to each other through files in the repo, and
 `.factory/dashboard.html` shows the board.
@@ -15,6 +15,13 @@ override, or run setup again to have it propose a rewrite.
 /plugin marketplace add zfdupont/plugins
 /plugin install factory@zfdupont-plugins
 ```
+
+In Codex: `codex plugin marketplace add zfdupont/plugins`, then
+`codex plugin add factory@zfdupont-plugins`, and mention `$factory:setup`. The
+loop is the same; `## Runtimes` in `skills/run/SKILL.md` lists what differs
+(spawning, follow-ups, questions). The `models` map's Claude model names are
+ignored in Codex, where agents inherit the session's model and take only the
+effort.
 
 ## Commands
 
