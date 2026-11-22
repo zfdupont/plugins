@@ -77,12 +77,12 @@ related:
   - path: /Users/zfdupont/outage-matcher
     contract: factory.yaml schema and layout (still pre-0.4.0 factory/)
 models:
-  triage: haiku
-  spec-writer: opus high
-  reviewers: sonnet high
+  triage: codex:gpt-6-luna medium
+  spec-writer: codex:gpt-6.2-astra high
+  reviewers: codex:gpt-6.2-sol high
   approver: opus high
   arbiter: opus high
-  scout: sonnet high
-  foundations-scout: sonnet high
-  tuner: opus high
-  roadmapper: opus high
+  scout: codex:gpt-6.2-sol high
+  foundations-scout: codex:gpt-6.2-sol high
+  tuner: codex:gpt-6.2-astra high
+  roadmapper: codex:gpt-6.2-astra high

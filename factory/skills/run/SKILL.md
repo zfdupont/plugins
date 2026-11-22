@@ -76,6 +76,21 @@ Claude Code:
 - Spawn: the Agent tool. Plugin agent `<role>` is `subagent_type`
   `factory:<role>`; a repo agent (reviewer, QA) is its own name. `model` and
   `effort` come from the `models` value.
+- A `codex:<id> [effort]` value runs that agent on Codex as a T3 Code child.
+  Load `mcp__t3-code__delegate_task` and `mcp__t3-code__orchestrator_capabilities`
+  with ToolSearch, and call `orchestrator_capabilities` once per thread. Call
+  `delegate_task` with `target: {providerInstanceId: <the codex provider>,
+  model: <id>, options: {reasoningEffort: <effort>}}`, `mode: "async"`,
+  `isolation: "shared"`, `title` = the agent's name, and `task` = the full
+  text of the agent's file without its frontmatter, then a line `---`, then
+  the prompt (plugin agent `<role>` is `../../agents/<role>.md`, resolved
+  against this skill's base directory; a repo agent is
+  `REPO/.claude/agents/<name>.md`). Start every agent of a review round before
+  you wait on any, follow each call's `next`, and do not poll. A follow-up to
+  a Codex child is a new `delegate_task` with the same `task` plus the
+  follow-up text. If the tools do not load, or no Codex provider with
+  `canRunChildTask` lists the id, spawn the agent with the Agent tool on
+  `inherit` and tell the owner once.
 - Follow-up to a running or finished agent: SendMessage to its id or name.
 - Ask the owner: AskUserQuestion (a multi-select question is `multiSelect`).
 
@@ -90,8 +105,8 @@ Codex:
     Plugin agent `<role>` is `../../agents/<role>.md`, resolved against this
     skill's base directory; a repo agent is `REPO/.claude/agents/<name>.md`.
   - Model: `opus`, `sonnet`, `haiku` and `fable` are Claude models; never pass
-    them. Omit `model` so the agent inherits yours. Pass the effort, if any, as
-    `reasoning_effort`.
+    them. Omit `model` so the agent inherits yours. For `codex:<id>`, pass
+    `<id>` as `model`. Pass the effort, if any, as `reasoning_effort`.
   - Parallel: spawn every agent of a review round before you wait on any.
 - Follow-up: `followup_task` with `target` = the agent's `task_name`.
 - Wait: `wait_agent` until every agent you wait on has finished, then check

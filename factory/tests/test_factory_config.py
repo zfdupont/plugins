@@ -76,6 +76,20 @@ def test_bad_model_value(tmp_path):
     assert "factory.yaml: models.builder 'gpt5 high' must be '<model> [effort]'" in validate(repo)
 
 
+def test_codex_model_values(tmp_path):
+    text = MINIMAL + "models: {reviewers: codex:gpt-6.2-sol high, triage: codex:gpt-6-luna, approver: opus high}\n"
+    repo = make_repo(tmp_path, text, agents=["factory-review-logic"])
+    assert validate(repo) == []
+
+
+def test_codex_model_rejects_builder_and_bad_ids(tmp_path):
+    text = MINIMAL + "models: {builder: codex:gpt-6.2-sol, scout: 'codex: high'}\n"
+    repo = make_repo(tmp_path, text, agents=["factory-review-logic"])
+    errors = validate(repo)
+    assert "factory.yaml: models.builder cannot be codex:; use builder.runtime: command to build with Codex" in errors
+    assert "factory.yaml: models.scout 'codex: high' must be '<model> [effort]'" in errors
+
+
 def test_missing_required_keys_and_version(tmp_path):
     repo = make_repo(tmp_path, "version: 2\n", agents=[])
     errors = validate(repo)

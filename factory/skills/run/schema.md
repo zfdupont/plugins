@@ -48,7 +48,7 @@ Any key not in this table is an error.
 | `escalate` | list of strings or `{when, paths}` | `[]` | the approver escalates on any of these, even when reviews pass. A string is prose only the approver can judge. An object adds `paths` (globs, same rules as Reviewers): when the diff matches none of them and the other auto-approve conditions hold, the orchestrator approves without the approver. See Escalate |
 | `lanes` | map | `{}` | optional fast lanes. Only `trivial` exists. See Lanes |
 | `related` | list of `{path, contract}` | `[]` | sibling repos; reviewers named `contract*` get them in their prompt |
-| `models` | map role to `<model> [effort]` | `{}` | roles: `spec-writer`, `builder`, `reviewers`, `approver`, `arbiter`, `scout`, `setup-surveyor`, `foundations-scout`, `tuner`, `triage`, `roadmapper`; model is `opus`, `sonnet`, `haiku`, `fable` or `inherit`; effort is `low`, `medium`, `high`, `xhigh` or `max`. In Codex the model is ignored (the agent inherits the session's model) and only the effort applies |
+| `models` | map role to `<model> [effort]` | `{}` | roles: `spec-writer`, `builder`, `reviewers`, `approver`, `arbiter`, `scout`, `setup-surveyor`, `foundations-scout`, `tuner`, `triage`, `roadmapper`; model is `opus`, `sonnet`, `haiku`, `fable`, `inherit`, or `codex:<id>` (a Codex model id, such as `codex:gpt-6.2-sol`); effort is `low`, `medium`, `high`, `xhigh` or `max`. In Claude Code a `codex:` agent runs as a T3 Code `delegate_task` child (see `## Runtimes` in SKILL.md). In Codex a Claude model is ignored (the agent inherits the session's model) and a `codex:` id is passed as the model. `models.builder` cannot be `codex:`; build with Codex through `builder.runtime: command` |
 
 ## Builder
 

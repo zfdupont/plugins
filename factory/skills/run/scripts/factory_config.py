@@ -54,7 +54,9 @@ WORK_FILES = (
     "roadmap-candidates.md", "roadmap-draft.md", "roadmap-answers.md",
 )
 DASHBOARD = Path(__file__).resolve().parent.parent / "dashboard.html"
-MODEL_RE = re.compile(r"^(opus|sonnet|haiku|fable|inherit)( (low|medium|high|xhigh|max))?$")
+MODEL_RE = re.compile(
+    r"^(opus|sonnet|haiku|fable|inherit|codex:[a-z0-9][a-z0-9._-]*)( (low|medium|high|xhigh|max))?$"
+)
 
 
 def config_path(repo: Path) -> Path:
@@ -249,6 +251,8 @@ def validate(repo: Path) -> list[str]:
     for role, value in mapping("models", MODEL_ROLES).items():
         if not MODEL_RE.match(str(value)):
             errors.append(f"factory.yaml: models.{role} '{value}' must be '<model> [effort]'")
+        elif role == "builder" and str(value).startswith("codex:"):
+            errors.append("factory.yaml: models.builder cannot be codex:; use builder.runtime: command to build with Codex")
 
     related = raw.get("related") or []
     if not isinstance(related, list):
