@@ -1,0 +1,88 @@
+version: 1
+base: main
+max_rework: 2
+max_arbiter_rework: 1
+context:
+  - README.md
+  - factory/README.md
+  - factory/skills/run/schema.md
+rules: factory/skills/run/SKILL.md#Rules
+tests: ok
+commands:
+  test: uv run -q --no-project --with pytest --with pyyaml pytest factory/tests -q
+  validate: claude plugin validate ./factory && claude plugin validate ./pstack && claude plugin validate .
+  typecheck-watch-pr: cd pstack/skills/poteto-mode/scripts && npm install --silent --no-audit --no-fund && npm run typecheck
+merge_gate: [test, validate]
+scout:
+  todo_paths:
+    - factory/skills/
+    - factory/agents/
+    - pstack/skills/statechart/scripts/
+    - pstack/skills/poteto-mode/scripts/
+  docs:
+    - README.md
+    - factory/README.md
+    - factory/docs/
+  checks:
+    - a test fails when the version in factory/.claude-plugin/plugin.json (or pstack's) differs from .claude-plugin/marketplace.json
+    - every factory_config.py subcommand has a CLI-level test in factory/tests that runs it against a fixture git repo
+    - nothing under factory/ hardcodes a specific repo's commands, paths, rules or reviewers
+    - every first-line token an agent writes (VERDICT, APPROVE/ESCALATE, ACCEPT/REWORK/OWNER, LANE) matches what run/SKILL.md parses
+builder:
+  runtime: claude
+  resume: session
+reviewers:
+  - name: invariants
+    why: factory.yaml schema, on-disk layout, board/job wire format and never-push are contracts sibling repos (sc, screeps, payments-ledger, outage-matcher) depend on
+  - name: logic
+    why: factory_config.py glob selection, lanes, escalate-hit and migrate decide reviewers and merges in user repos; the skills' loop has many branch points
+  - name: maintainability
+    why: 185 Markdown skill and agent files must stay consistent with each other, with schema.md and with README.md; pstack keeps the upstream prose lightly edited
+  - name: cli
+    paths:
+      - factory/skills/run/scripts/**
+      - pstack/skills/statechart/scripts/**
+      - pstack/skills/poteto-mode/scripts/**
+    why: factory_config.py output is parsed by the orchestrator, and statechart and watch-pr are user-facing CLIs
+  - name: prompt-contract
+    paths:
+      - factory/skills/**
+      - factory/agents/**
+    why: skills and agents hand files and first-line tokens to each other; a drift silently breaks the loop and nothing tests the prose
+qa: null
+escalate:
+  - when: changes the factory.yaml schema, validation, defaults, the on-disk layout or migrate
+    paths: [factory/skills/run/scripts/factory_config.py, factory/skills/run/schema.md]
+  - when: changes release metadata or a plugin version
+    paths: [.claude-plugin/**, factory/.claude-plugin/**, pstack/.claude-plugin/**]
+  - when: adds a dependency or changes the build toolchain
+    paths: ["**/package.json", "**/bun.lock", "**/package-lock.json", "**/tsconfig*.json"]
+  - changes the board.json shape, job file names, board stages, verdict vocabulary, or a first-line token an agent writes or the orchestrator parses
+  - weakens never-push, merge-only-after-approval, or setup/tune write-only-after-approval
+  - adds anything repo-specific (a command, path, rule or reviewer name) to factory/ outside docs and test fixtures
+  - adds a dependency, changes the build toolchain, or deletes tests
+lanes:
+  trivial:
+    paths: ["factory/docs/**", "docs/**", "README.md", "factory/README.md", "pstack/README.md"]
+    max_changed_lines: 40
+    skip: [spec, approval]
+related:
+  - path: /Users/zfdupont/sc
+    contract: factory.yaml schema, docs/factory + .factory layout, board.json and job files, .claude/agents reviewers; has a live board with jobs
+  - path: /Users/zfdupont/screeps
+    contract: factory.yaml schema and layout (still pre-0.4.0 factory/)
+  - path: /Users/zfdupont/payments-ledger
+    contract: factory.yaml schema and layout (still pre-0.4.0 factory/)
+  - path: /Users/zfdupont/outage-matcher
+    contract: factory.yaml schema and layout (still pre-0.4.0 factory/)
+models:
+  triage: haiku
+  spec-writer: opus high
+  builder: sonnet high
+  reviewers: sonnet high
+  approver: opus high
+  arbiter: opus high
+  scout: sonnet high
+  foundations-scout: sonnet high
+  tuner: opus high
+  roadmapper: opus high
