@@ -11,7 +11,7 @@
       "name": "pstack",
       "source": "./pstack",
       "description": "A native Claude Code port of poteto's pstack: rigorous agent workflows you can parallelize with confidence.",
-      "version": "0.15.36-claude.2",
+      "version": "0.15.36-claude.3",
       "category": "development"
     },
     {

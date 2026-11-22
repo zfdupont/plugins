@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 In Codex (you have `spawn_agent`, not `Agent`), first read `../poteto-mode/references/runtimes.md`, resolved against this skill's base directory. It maps this skill's Claude Code tools, model names and paths.
 
+A role value that starts with `codex:` runs on Codex. In Claude Code, spawn that seat per `../poteto-mode/references/codex-delegates.md`, resolved against this skill's base directory.
+
 Investigate the motivation and intent behind code. The companion `how` skill answers what the code does and how it works. `why` answers what forces led to its shape.
 
 Each spawn below names a role line in the `~/.claude/rules/pstack-models.md` rule and a default. Set `model` to that line's value, or to the default if the rule or the line is missing. Leave `model` unset when the value is `auto` or `inherit-parent`. If the Agent tool rejects a model, use the default and say so. If it rejects the default, use the closest valid model of the same model from its error message. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.

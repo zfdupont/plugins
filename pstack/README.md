@@ -23,7 +23,7 @@ fork it. improve it. make it yours. PRs are welcome!
 
 claude code leaves auto-update off for third-party marketplaces. to turn it on, run `/plugin`, open the **marketplaces** tab, select `zfdupont-plugins`, and choose **enable auto-update**. to update once by hand, run `claude plugin update pstack@zfdupont-plugins`.
 
-claude code prefixes plugin commands and agents, so `/poteto-mode` is `/pstack:poteto-mode` and the subagent is `pstack:poteto-agent`. `/pstack:setup-pstack` writes your model choices to `~/.claude/rules/pstack-models.md`, which claude code loads into every session.
+claude code prefixes plugin commands and agents, so `/poteto-mode` is `/pstack:poteto-mode` and the subagent is `pstack:poteto-agent`. `/pstack:setup-pstack` writes your model choices to `~/.claude/rules/pstack-models.md`, which claude code loads into every session. in t3 code with codex enabled, a role can name a codex model (`codex:gpt-6.2-sol high`), and that seat runs as a t3 `delegate_task` child.
 
 ### codex
 
