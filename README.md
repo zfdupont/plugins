@@ -30,7 +30,9 @@ uv run scripts/codex_agents.py plugins --check    # exit 1 if any are stale
 
 Factory works in Codex without this step: when `factory-<role>` is not a
 registered agent, it spawns a plain subagent with the agent file's text as the
-prompt. pstack's skills still assume Claude Code's Agent tool.
+prompt. pstack does the same for `poteto-agent` and `comment-sicko`, and maps
+the rest of its Claude Code tools, models and paths in
+[`runtimes.md`](./pstack/skills/poteto-mode/references/runtimes.md).
 
 Tests for the converter: `uv run -q --no-project --with pytest pytest tests -q`.
 

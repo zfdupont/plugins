@@ -5,6 +5,8 @@ description: Configure which models pstack uses per role and at what reasoning b
 
 # Setup pstack
 
+In Codex (you have `spawn_agent`, not `Agent`), first read `../poteto-mode/references/runtimes.md`, resolved against this skill's base directory. It maps this skill's Claude Code tools, model names and paths.
+
 Write `~/.claude/rules/pstack-models.md`, a rule file that sets pstack's model per role. Claude Code loads every `.md` file in `~/.claude/rules/` into each new session, so the role lines are always in context. Never put the role lines in `CLAUDE.md` or `AGENTS.md`.
 
 ## Steps

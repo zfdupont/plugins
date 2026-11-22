@@ -6,6 +6,8 @@ disable-model-invocation: true
 
 # Automate me
 
+In Codex (you have `spawn_agent`, not `Agent`), first read `../poteto-mode/references/runtimes.md`, resolved against this skill's base directory. It maps this skill's Claude Code tools, model names and paths.
+
 A guided flow for turning the user's working conventions into a skill agents will follow. The output is one `-mode` skill tailored to them (e.g. `jay-mode`, `priya-mode`).
 
 This skill orchestrates three others: an inline mining pass (see step 1), the `skill-creator` skill (authoring), and the **unslop** skill (prose discipline). It sequences them. It doesn't replace them.
