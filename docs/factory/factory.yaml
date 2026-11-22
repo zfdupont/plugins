@@ -9,7 +9,7 @@ context:
 rules: factory/skills/run/SKILL.md#Rules
 tests: ok
 commands:
-  test: uv run -q --no-project --with pytest --with pyyaml pytest factory/tests -q
+  test: uv run -q --no-project --with pytest --with pyyaml pytest factory/tests tests -q
   validate: claude plugin validate ./factory && claude plugin validate ./pstack && claude plugin validate .
   typecheck-watch-pr: cd pstack/skills/poteto-mode/scripts && npm install --silent --no-audit --no-fund && npm run typecheck
 merge_gate: [test, validate]
@@ -29,8 +29,9 @@ scout:
     - nothing under factory/ hardcodes a specific repo's commands, paths, rules or reviewers
     - every first-line token an agent writes (VERDICT, APPROVE/ESCALATE, ACCEPT/REWORK/OWNER, LANE) matches what run/SKILL.md parses
 builder:
-  runtime: claude
-  resume: session
+  runtime: command
+  command: codex exec --sandbox danger-full-access -c model_reasoning_effort=high --json -o {out_prefix}-last.md - < {prompt_file} > {out_prefix}.jsonl 2> {out_prefix}.err
+  resume: fresh
 reviewers:
   - name: invariants
     why: factory.yaml schema, on-disk layout, board/job wire format and never-push are contracts sibling repos (sc, screeps, payments-ledger, outage-matcher) depend on
@@ -78,7 +79,6 @@ related:
 models:
   triage: haiku
   spec-writer: opus high
-  builder: sonnet high
   reviewers: sonnet high
   approver: opus high
   arbiter: opus high
