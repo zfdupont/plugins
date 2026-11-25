@@ -36,6 +36,10 @@ the rest of its Claude Code tools, models and paths in
 
 Tests for the converter: `uv run -q --no-project --with pytest pytest tests -q`.
 
+`scripts/hooks/pre-push` refreshes every plugin in `.claude-plugin/marketplace.json`
+in Claude Code and Codex after a push of `main`. Enable it once per clone with
+`git config core.hooksPath scripts/hooks`. Log: `.git/plugin-update.log`.
+
 | plugin | what it is |
 | --- | --- |
 | [pstack](./pstack) | A native Claude Code port of [poteto's pstack](https://github.com/cursor/plugins/tree/1ba91fc25c0977741dd0e267849e6234b037ed0a/pstack) for Cursor. Start with `/pstack:setup-pstack`, then use `/pstack:poteto-mode`. |
