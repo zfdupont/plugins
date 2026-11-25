@@ -1,0 +1,67 @@
+#!/bin/sh
+# After a push of main to origin, refresh this marketplace and every plugin it
+# lists, in Claude Code and in Codex. The marketplace name and plugin list come
+# from .claude-plugin/marketplace.json at the pushed commit, so adding a plugin
+# there is enough.
+# Git has no post-push hook, so this starts a background job
+# that waits until the push has updated refs/remotes/origin/main, then updates.
+# It never blocks or fails the push. Log: .git/plugin-update.log
+
+remote="$1"
+[ "$remote" = "origin" ] || exit 0
+
+sha=""
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$remote_ref" = "refs/heads/main" ] && sha="$local_sha"
+done
+[ -n "$sha" ] || exit 0
+case "$sha" in 0000000000000000000000000000000000000000) exit 0 ;; esac
+
+git_dir=$(git rev-parse --absolute-git-dir)
+log="$git_dir/plugin-update.log"
+
+(
+  i=0
+  while [ "$(git rev-parse -q --verify refs/remotes/origin/main)" != "$sha" ]; do
+    i=$((i + 1))
+    if [ "$i" -gt 120 ]; then
+      echo "$(date '+%F %T') push of $sha not confirmed after 120s; skipped update"
+      exit 0
+    fi
+    sleep 1
+  done
+
+  manifest=$(git show "$sha:.claude-plugin/marketplace.json") || {
+    echo "$(date '+%F %T') no .claude-plugin/marketplace.json at $sha; skipped update"
+    exit 0
+  }
+  read_manifest() {
+    printf '%s' "$manifest" | python3 -c "$1"
+  }
+  market=$(read_manifest 'import json,sys; print(json.load(sys.stdin)["name"])')
+  plugins=$(read_manifest 'import json,sys; [print(p["name"]) for p in json.load(sys.stdin).get("plugins", [])]')
+  if [ -z "$market" ] || [ -z "$plugins" ]; then
+    echo "$(date '+%F %T') could not read marketplace name or plugins at $sha; skipped update"
+    exit 0
+  fi
+
+  echo "$(date '+%F %T') main pushed at $sha; updating $market:" $plugins
+  claude plugin marketplace update "$market"
+  for p in $plugins; do
+    claude plugin update "$p@$market"
+  done
+  echo "$(date '+%F %T') Claude Code done; restart Claude Code to load the update"
+
+  if command -v codex >/dev/null 2>&1; then
+    for p in $plugins; do
+      if codex plugin add "$p@$market"; then
+        echo "$(date '+%F %T') Codex $p ready"
+      else
+        echo "$(date '+%F %T') Codex $p install failed"
+      fi
+    done
+    echo "$(date '+%F %T') Codex done; start a new Codex session to load it"
+  fi
+) >>"$log" 2>&1 </dev/null &
+
+exit 0
