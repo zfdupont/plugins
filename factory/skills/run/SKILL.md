@@ -6,7 +6,7 @@ description: Run the software factory on one feature, from spec to merge. Use fo
 # Factory
 
 You are the orchestrator. You run the loop below, spawn every agent, and you are
-the only writer of `.factory/board.json`. Agents get their context from files and
+the only writer of your job's entry in `.factory/board.json`. Agents get their context from files and
 from the values you pass, not from this conversation, and each writes only its
 own file.
 
@@ -33,7 +33,7 @@ Run this before every command except `/factory:setup`.
 2. Read the settings with `CFG get REPO <key>` and keep them for this run:
    `base`, `max_rework`, `max_arbiter_rework`, `worktrees`, `context`, `rules`,
    `tests`, `commands`, `merge_gate`, `scout`, `builder`, `reviewers`, `qa`,
-   `escalate`, `related`, `models`, `lanes`. `NO_TESTS` is true when `tests` is `none` or
+   `escalate`, `related`, `models`, `lanes`, `session`. `NO_TESTS` is true when `tests` is `none` or
    `thin`.
 
 Worktrees are `<worktrees>/<job-id>`, resolved against REPO, outside the repo
@@ -119,6 +119,49 @@ Codex:
 Both: the `builder` field on the board holds the name you send follow-ups to.
 `builder.runtime: claude` means "a subagent of this session" in either host.
 
+## Job sessions
+
+When `session` is `new`, `/factory:run`, `/factory:next`, `/factory:milestone`
+and `/factory:rework` run each job in a new T3 Code thread, so this session
+stays free and several jobs can run at once. This session is the launcher; the
+new thread is the job session and runs the loop.
+
+Skip this section, and run the job here, when any of these is true:
+- `session` is `same`;
+- your prompt starts with `Factory job session` (you are already the job
+  session; never launch another);
+- you have no `t3_thread_launch` tool from the T3 Code MCP server (plain
+  Claude Code, or Codex outside T3 Code). In Claude Code it may be deferred:
+  load `mcp__t3-code__t3_thread_launch` with ToolSearch before you decide. In
+  Codex it is in your tool list or it is not there. Tell the owner once that
+  the job runs here.
+
+To launch:
+1. Do the command's launcher steps (each command below says which). They
+   reserve the job id and write its first files, so two sessions never pick
+   the same id.
+2. Call `t3_thread_launch` with `title` = `factory <job-id>` (for a milestone
+   list, `factory M<N>[,M<N>...]`), `workspaceStrategy: {type: "root"}` when
+   REPO is the T3 project's checkout, else `{type: "existing_worktree",
+   worktreePath: REPO}`. Omit the model and modes so the thread inherits
+   yours. `message`:
+
+   ```
+   Factory job session. Read <this skill's base directory>/SKILL.md and treat
+   its base directory as the factory skill's base directory. REPO is <REPO>.
+   Run its `## Setup check`, then <the command's continue step>.
+   ```
+3. If the call fails, tell the owner why and run the job here.
+4. Otherwise set the job's board `session` to the thread's `link` (for a
+   milestone list, skip this; the job session sets it when it creates each
+   job), tell the owner the link in one line, and stop. Do not wait on the
+   thread or read it unless the owner asks.
+
+A job session sets `session` on each job it creates to its own thread link if
+it knows it, else leaves it out. Every session re-reads `board.json` right
+before each write and changes only its own job, since other job sessions
+write the same file.
+
 ## The loop
 
 ```
@@ -154,6 +197,7 @@ after every state change (read it, change the one job, write it back).
   "branch": "factory/004-status-json",
   "worktree": "<worktrees>/004-status-json",
   "builder": "<agent id or name used for follow-ups, or the runner session id>",
+  "session": "<link of the T3 Code thread running the job, if any>",
   "lane": "full",
   "stage": "review",
   "round": 2,
@@ -214,6 +258,10 @@ short kebab-case slug of the feature.
    Set stage `build`, round 1.
 4. Run the builder for round 1 (below).
 5. Run a review round (below).
+
+With `## Job sessions` in effect, step 1 is the launcher step; the continue
+step is "follow `## /factory:run` from step 1b for job <id>; its feature.md and
+board entry already exist."
 
 ## Builder round N
 
@@ -409,6 +457,10 @@ that does not reach `merged`):
    confirmed; otherwise stop and say which `/factory:milestone` to run after the
    check.
 
+With `## Job sessions` in effect, there is no launcher step: one job session
+runs the whole list, in order. The continue step is "follow `## milestone`
+with these arguments: <the arguments>."
+
 ## roadmap
 
 `/factory:roadmap`. Finds long-term goals, interviews the owner, and writes the
@@ -468,6 +520,9 @@ Do not spawn an agent.
 Read `docs/factory/backlog.md`. Take the first `- [ ]` item (items under
 `## Foundations` come first because that section is at the top). Change it to
 `- [x]` with ` (job <id>)` appended, then run `## /factory:run` with that item.
+With `## Job sessions` in effect, marking the item and `## /factory:run` step 1
+are the launcher steps, and the continue step is the one `## /factory:run`
+gives.
 If there is none, say so and suggest `/factory:scout` and
 `/factory:scout foundations`.
 
@@ -516,6 +571,12 @@ say which stage it is at and stop.
    `rework-<round>.md`; otherwise spawn a fresh one and tell it to read
    `build.md` and `rework-<round>.md` first.
 4. Run a review round, then Approval as usual.
+
+With `## Job sessions` in effect, the stage check and writing the note in step
+1 are the launcher steps. The continue step is "follow `## rework` for job
+<id>; the note is already in `jobs/<id>/rework-<round+1>.md`, so do not write
+it again." A builder from an earlier session is not reachable, so step 3
+spawns a fresh one.
 
 ## Rules
 

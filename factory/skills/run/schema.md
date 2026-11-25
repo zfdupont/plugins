@@ -35,6 +35,7 @@ Any key not in this table is an error.
 | `base` | string | required | branch jobs start from and merge into |
 | `max_rework` | int | `2` | builder resumes per job before arbitration |
 | `max_arbiter_rework` | int | `1` | automatic arbiter `REWORK`s per job |
+| `session` | `new` or `same` | `new` | `new`: `/factory:run`, `/factory:next`, `/factory:milestone` and `/factory:rework` hand the job to a new T3 Code thread (see `## Job sessions` in SKILL.md); `same`: run it in the session that got the command. Outside T3 Code the job always runs in the same session |
 | `worktrees` | string | `../<repo-dir>-factory` | job worktrees go in `<worktrees>/<job-id>` |
 | `context` | list of paths | `[]` | what spec-writer, builder, reviewers, approver and arbiter read first |
 | `rules` | path, optional `#Heading` | none | the repo's hard rules (for example `.mex/AGENTS.md#Non-Negotiables`) |
