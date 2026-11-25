@@ -23,7 +23,7 @@ import yaml
 KNOWN_KEYS = {
     "version", "base", "max_rework", "max_arbiter_rework", "worktrees", "context",
     "rules", "tests", "commands", "merge_gate", "scout", "builder", "reviewers", "qa",
-    "escalate", "related", "models", "lanes",
+    "escalate", "related", "models", "lanes", "session",
 }
 LANE_NAMES = {"trivial"}
 LANE_KEYS = {"paths", "max_changed_lines", "skip"}
@@ -78,6 +78,7 @@ def load(repo: Path) -> dict:
     commands = cfg.get("commands") or {}
     cfg.setdefault("max_rework", 2)
     cfg.setdefault("max_arbiter_rework", 1)
+    cfg.setdefault("session", "new")
     cfg.setdefault("worktrees", f"../{repo.resolve().name}-factory")
     cfg.setdefault("merge_gate", ["test"] if "test" in commands else [])
     cfg.setdefault("tests", "ok" if "test" in commands else "none")
@@ -145,6 +146,8 @@ def validate(repo: Path) -> list[str]:
     for key in ("max_rework", "max_arbiter_rework"):
         if key in raw and not (isinstance(raw[key], int) and not isinstance(raw[key], bool) and raw[key] >= 0):
             errors.append(f"factory.yaml: {key} must be a whole number")
+    if "session" in raw and raw["session"] not in ("new", "same"):
+        errors.append("factory.yaml: session must be new or same")
     tests = raw.get("tests")
     if tests is not None and tests not in TESTS_STATES:
         errors.append("factory.yaml: tests must be none, thin or ok")

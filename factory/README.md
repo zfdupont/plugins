@@ -42,6 +42,12 @@ effort.
 
 The factory merges locally and never pushes.
 
+In T3 Code, `/factory:run`, `/factory:next`, `/factory:milestone` and
+`/factory:rework` start each job in a new thread and hand you its link, so the
+session you typed in stays free and jobs can run side by side. Set
+`session: same` in `factory.yaml` to run jobs in the current session instead.
+Outside T3 Code jobs always run in the current session.
+
 ## Files in your repo
 
 The factory keeps two folders, the way superpowers splits `docs/superpowers/`

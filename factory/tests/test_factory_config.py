@@ -11,6 +11,14 @@ def test_valid_minimal_config(tmp_path):
     assert cfg["merge_gate"] == ["test"]
     assert cfg["builder"] == {"runtime": "claude", "resume": "session"}
     assert cfg["worktrees"] == "../repo-factory"
+    assert cfg["session"] == "new"
+
+
+def test_session_values(tmp_path):
+    repo = make_repo(tmp_path, MINIMAL + "session: same\n", agents=["factory-review-logic"])
+    assert validate(repo) == [] and load(repo)["session"] == "same"
+    bad = make_repo(tmp_path / "bad", MINIMAL + "session: fork\n", agents=["factory-review-logic"])
+    assert "factory.yaml: session must be new or same" in validate(bad)
 
 
 def test_unknown_key_named(tmp_path):
